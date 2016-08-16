@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico">
+
+    <title>Log Analyzer</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/jquery.bootgrid.css" rel="stylesheet">
+	<link href="css/bootstrap-toggle.min.css" rel="stylesheet">
+    <style>
+    body { padding-top: 70px; }
+    table th.action {
+        width: 40px;
+    }
+    table th.id{
+        width: 10%;
+    }
+    table th.user{
+        width: 15%;
+    }
+
+    </style>
+  </head>
+
+  <body>
+
+    <!-- Fixed navbar -->
+    <nav class="navbar navbar-default navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <span class="navbar-brand">Log Analyzer</span>
+          <span id="server_name" class="navbar-brand"></span>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav navbar-right">
+            <li><a href="#" data-tab="help_tab">Help</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div id="tabs">
+    <div id="main_tab" class="container-fluid">
+      <div class="row">
+        <div><!--col-->
+          <div id="techdump_panel" class="panel panel-default">
+            <div class="panel-heading">
+                <div class="panel-heading-text" style="display:inline-block">
+                    Techdump
+                </div>
+            </div>
+            <div class="panel-body">                
+				<form class="form-inline" style="display:inline-block;">
+					<div class="form-group">
+						<label class="col-md-4 control-label" for="channel_number">CHANNEL</label>
+						<div class="col-md-2">
+						  <select id="channel_number" name="channel_number" class="form-control">
+							<option value="1">Channel 1</option>
+							<option value="2">Channel 2</option>
+							<option value="3">Channel 3</option>
+							<option value="4">Channel 4</option>
+							<option value="5">Channel 5</option>
+							<option value="6">Channel 6</option>
+							<option value="7">Channel 7</option>
+							<option value="8">Channel 8</option>
+							<option value="9">Channel 9</option>
+							<option value="10">Channel 10</option>
+							<option value="11">Channel 11</option>
+							<option value="12">Channel 12</option>
+							<option value="13">Channel 13</option>
+							<option value="14">Channel 14</option>
+							<option value="15">Channel 15</option>
+							<option value="16">Channel 16</option>
+							<option value="17">Channel 17</option>
+							<option value="18">Channel 18</option>
+							<option value="19">Channel 19</option>
+							<option value="20">Channel 20</option>
+							<option value="21">Channel 21</option>
+							<option value="22">Channel 22</option>
+							<option value="23">Channel 23</option>
+							<option value="24">Channel 24</option>
+							<option value="25">Channel 25</option>
+							<option value="26">Channel 26</option>
+							<option value="27">Channel 27</option>
+							<option value="28">Channel 28</option>
+							<option value="29">Channel 29</option>
+							<option value="30">Channel 30</option>
+							<option value="31">Channel 31</option>
+						  </select>
+						</div>
+					</div>
+				</form>
+				<label class="btn btn-default">
+					<input id="upload_techdump" type="file" class="form-control" style="display:none;">
+					<span>Upload</span> <span class="glyphicon glyphicon-floppy-open"></span>
+				</label>				
+				<button id="asset_remove_check" class="btn btn-default">
+					<span>Remove</span> <span class="glyphicon glyphicon-floppy-remove"></span>
+				</button>
+				<button id="asset_refresh" class="btn btn-default">
+					<span>Refresh</span> <span class="glyphicon glyphicon-refresh"></span>
+				</button>		
+					<input id="toggle_test_train" type="checkbox" checked data-toggle="toggle" data-on="TEST" data-off="TRAIN"  data-onstyle="primary" data-offstyle="info" class="checkbox">				  
+				<div id="upload_techdump_progress" class="progress"><div class="progress-bar"></div></div>
+            </div>
+          </div>
+        </div><!--col-->
+		<div><!--col-->
+          <div id="training_panel" class="panel panel-default">
+            <div class="panel-heading">Training</div>
+            <div class="panel-body">				
+				<form class="form-inline" style="display:inline-block;">
+					<div class="form-group">
+						<label class="col-md-4 control-label" for="channel_number">LABEL</label>
+						<div class="col-md-4">
+						  <select id="channel_number" name="channel_number" class="form-control">
+							<option value="1">CC</option>					
+						  </select>
+						</div>
+					</div>
+				</form>
+				<input id="toggle_good_bad" type="checkbox" checked data-toggle="toggle" data-on="GOOD" data-off="BAD" data-onstyle="success" data-offstyle="danger" class="checkbox">
+			</div>
+          </div>
+        </div><!--col-->        
+      </div><!--row-->
+	  <div><!--row-->
+		<div><!--col-->
+		  <div id="analysis_panel" class="panel panel-default">
+			<div class="panel-heading">Analysis</div>
+			<div class="panel-body">				
+			</div>
+		  </div>
+		</div><!--col-->
+	  </div>
+    </div><!--main_tab-->
+
+    <div id="second_tab" class="container-fluid">
+      <div class="row">
+        
+
+        <div><!--col-->
+          <div id="capturing_panel" class="panel panel-default">
+            <div class="panel-heading">dummy</div>
+            <div class="panel-body">                
+            </div>
+          </div>
+        </div><!--col-->
+
+      </div><!--row-->
+    </div><!--second_tab-->
+
+    <div id="help_tab" class="container-fluid">
+          <div id="settings_panel" class="panel panel-default">
+            <div class="panel-heading">About</div>
+            <div class="panel-body">
+              <h1>TranscodePack Log Analyzer</h1>
+
+              <div id="api_help">
+                <h3>API Help</h3>
+              </div>
+              <h3>Credit</h3>
+              <pre>
+Log Analyzer is built on these tools:
+Backend
+- Python
+Frontend
+- Twitter Bootstrap http://getbootstrap.com/
+- jQuery https://jquery.com/
+- Bootgrid http://www.jquery-bootgrid.com/
+- Bootstrap Notify http://bootstrap-growl.remabledesigns.com/
+- Bootstrap Toggle http://www.bootstraptoggle.com/
+              </pre>
+            </div>
+          </div>
+    </div><!--help_tab-->
+
+    </div><!--tabs-->
+
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/bootstrap-notify.js"></script>
+    <script src="js/jquery.bootgrid.js"></script>
+    <script src="js/UI.js"></script>
+	<script src="js/bootstrap-toggle.min.js"></script>
+    <script>
+    var capturing = {};
+
+    UI.setup({
+        tabs:
+        {
+            'main_tab':
+            {
+                panels:
+                {
+                    'techdump_panel':
+                    {
+                        width: 6,
+                        widable: true
+                    },                    
+					'training_panel':
+                    {
+                        width: 6,
+                        widable: true
+                    },
+					'analysis_panel':
+					{
+                        width: 14,
+                        widable: true
+                    }					
+                },
+                actions:
+                [   
+                    /*
+					{
+                        oper: 'status',
+                        param: {type: 'sync'},
+                        action: make_sync_status,
+                        periodic: 3
+                    },
+                    {
+                        oper: 'assets',
+                        action: make_assets_table,
+                        periodic: 60*10 //10 min
+                    },
+                    {
+                        oper: 'status',
+                        param: {type:'stream'},
+                        action: make_streaming_table,
+                        periodic: 3
+                    }
+					*/
+                ]
+            },
+            'second_tab':
+            {
+                panels:
+                {                    
+                    'capturing_panel': {}
+                },
+                actions:
+                [
+                    /*
+					{
+                        oper: 'scan',
+                        action: make_streams_table,
+                        periodic: 6
+                    },
+                    {
+                        oper: 'status',
+                        param: {type:'capture'},
+                        action: make_capturing_table,
+                        periodic: 2
+                    }*/
+                ]
+            },
+            'help_tab':
+            {
+            }
+        },
+        /*
+		dialogs:
+        {
+            'stream_dialog':
+            {
+                action: function (asset, mcast, loop)
+                {
+                    var addr = mcast.split(':')[0];
+                    var port = mcast.split(':')[1];
+                    var loop = loop ? 1:0;
+                    if( asset.indexOf(".pcap") == -1) {
+                        operation('stream', {
+                            asset: asset,
+                            addr: addr,
+                            port: port,
+                            loop: loop
+                        }, notify);
+                    } else {
+                        operation('stream', {
+                            asset: asset,
+                            loop: loop
+                        }, notify);
+                    }
+                    return true;
+                }
+            },
+            'capture_dialog':
+            {
+                action: function (mcast, duration, cap)
+                {
+                    var addr = mcast.split(':')[0];
+                    var port = mcast.split(':')[1];
+                    var duration = parseInt(duration);
+                    var cap = cap ? 1:0;
+                    operation('capture', {
+                        addr: addr,
+                        port: port,
+                        duration: duration,
+                        cap: cap
+                    }, function(res) {
+                        capturing[res['ID']] = true;
+                        notify(res);
+                    });
+                    return true;
+                }
+            }
+        }*/
+    });
+    setup_functions();	
+
+    function setup_functions()
+    {		
+		$('#upload_techdump').on('change', function(event)
+        {
+            var file = event.target.files[0];
+            var req = new XMLHttpRequest();
+            req.open('PUT', '/techdump/'+file.name);
+            req.onload = function(event) {
+                notify({
+                    message: 'upload '+file.name+' completed'
+                });
+                $('#upload_techdump_progress').hide();
+                $('#upload_techdump_progress .progress-bar').width(0+'%');
+                //operation('assets', '', make_assets_table);
+            }
+            req.onerror = function(event) {
+                notify({
+                    exception: 'upload failed'
+                });
+                $('#upload_techdump_progress').hide();
+            }
+            req.upload.onprogress = function(event) {
+                var per = event.loaded/event.total*100;
+                $('#upload_techdump_progress .progress-bar').width(per+'%');
+            }
+            $('#upload_techdump_progress').show();
+            req.send(file);
+            notify({
+                message: 'uploading...'
+            });
+        });
+        $('#upload_techdump_progress').hide();
+
+        $('#asset_remove_check').click(function(){
+            files = [];
+            $("input[name=rm]:checked").each(function(){
+                files.push($(this).val());
+            });
+            console.log(files);
+            $('#remove_dialog').modal('show')
+                .find('p[name="asset"]').text(files);
+        });
+
+        $('#asset_remove').click(function(){
+            files = [];
+            $("input[name=rm]:checked").each(function(){
+                files.push($(this).val());
+            });
+            operation('remove', files, function(res){
+                notify(res);
+                operation('assets', '', make_assets_table);
+            });
+        });
+
+        $('#asset_sync_dialog_fetch').click(function(){
+            var $inputs = $('#sync_dialog input');
+            var params = {};
+            $inputs.each(function(){
+                params[this.name] = $(this).val();
+            });
+            operation('sync', params, function(res){
+                notify(res);
+                operation('assets', '', make_assets_table);
+            });
+        });
+
+        $('#asset_sync_dialog_push').click(function(){
+            var $inputs = $('#sync_dialog input');
+            var params = {};
+            $inputs.each(function(){
+                params[this.name] = $(this).val();
+            });
+            operation('ask_to_sync', params, function(res){
+                notify(res);
+            });
+        });
+
+        $('#asset_refresh').click(function()
+        {
+            operation('refresh', '', function(res)
+            {
+                notify(res);
+                operation('assets', '', make_assets_table);
+            });
+        });
+
+        $('#asset_sync').click(function(){
+            $('#sync_dialog').modal('show');
+        });
+		
+		$(document).ready(function () {	
+			$('#training_panel').hide();
+			$('#toggle_test_train').change(function() 
+			{		  
+			  if ($(this).prop('checked')) {
+				console.log("hide")	
+				$('#training_panel').hide();
+			  }
+			  else {
+				console.log("show")				
+				$('#training_panel').show();
+			  }		  
+			});	
+		});
+    }
+    function make_sync_status(data)
+    {
+        var title = 'Assets';
+        if ('log' in data && data['log'].indexOf('Ready') == -1) {
+            var title = 'Assets (' + data['log'] + ')';
+            $('#assets_panel .panel-heading .panel-heading-text').text(title);
+            operation('refresh', '', function(res)
+            {
+                operation('assets', '', make_assets_table);
+            });
+        } else {
+            $('#assets_panel .panel-heading .panel-heading-text').text(title);
+        }
+    }    
+    </script>
+  </body>
+</html>
