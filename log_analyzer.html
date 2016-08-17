@@ -108,15 +108,18 @@
 				<button id="asset_refresh" class="btn btn-default">
 					<span>Refresh</span> <span class="glyphicon glyphicon-refresh"></span>
 				</button>		
-					<input id="toggle_test_train" type="checkbox" checked data-toggle="toggle" data-on="TEST" data-off="TRAIN"  data-onstyle="primary" data-offstyle="info" class="checkbox">				  
+					<input id="toggle_test_train" type="checkbox" checked data-toggle="toggle" data-on="TEST" data-off="TRAIN"  data-onstyle="primary" data-offstyle="info" class="checkbox">
+				<button id="analyze" class="btn btn-default">
+					<span>Analyze</span> <span class="glyphicon glyphicon-play-circle"></span>
+				</button>	
 				<div id="upload_techdump_progress" class="progress"><div class="progress-bar"></div></div>
             </div>
           </div>
         </div><!--col-->
 		<div><!--col-->
-          <div id="training_panel" class="panel panel-default">
+		<div id="training_panel" class="panel panel-default">
             <div class="panel-heading">Training</div>
-            <div class="panel-body">				
+            <div class="panel-body">
 				<form class="form-inline" style="display:inline-block;">
 					<div class="form-group">
 						<label class="col-md-4 control-label" for="channel_number">LABEL</label>
@@ -124,10 +127,13 @@
 						  <select id="channel_number" name="channel_number" class="form-control">
 							<option value="1">CC</option>					
 						  </select>
-						</div>
+						</div>						
 					</div>
 				</form>
 				<input id="toggle_good_bad" type="checkbox" checked data-toggle="toggle" data-on="GOOD" data-off="BAD" data-onstyle="success" data-offstyle="danger" class="checkbox">
+				<button id="train" class="btn btn-default">
+					<span>Train</span> <span class="glyphicon glyphicon-road"></span>
+				</button>
 			</div>
           </div>
         </div><!--col-->        
@@ -319,11 +325,21 @@ Frontend
 
     function setup_functions()
     {		
+		var filename = ""
+		var channel = "1"
+		
+		$('#channel_number').on('change', function()
+		{
+			channel = $(this).val()
+		});
+		
+		
 		$('#upload_techdump').on('change', function(event)
         {
             var file = event.target.files[0];
             var req = new XMLHttpRequest();
-            req.open('PUT', '/techdump/'+file.name);
+			filename = file.name
+            req.open('PUT', '/techdumps/'+file.name);
             req.onload = function(event) {
                 notify({
                     message: 'upload '+file.name+' completed'
@@ -407,16 +423,29 @@ Frontend
             $('#sync_dialog').modal('show');
         });
 		
+		$('#analyze').click(function()
+        {
+            var params = {};
+			params['channel_number'] = channel
+			params['filename'] = filename
+			operation('analyze', params, function(res)
+            {
+                notify(res);                
+            });
+        });
+		
 		$(document).ready(function () {	
 			$('#training_panel').hide();
 			$('#toggle_test_train').change(function() 
 			{		  
 			  if ($(this).prop('checked')) {
-				console.log("hide")	
+				//console.log("hide")	
+				$('#analyze').show();
 				$('#training_panel').hide();
 			  }
 			  else {
-				console.log("show")				
+				//console.log("show")				
+				$('#analyze').hide();
 				$('#training_panel').show();
 			  }		  
 			});	
