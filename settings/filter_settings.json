@@ -1,3 +1,42 @@
-{
-	
+{	
+	"oplan": 
+	{
+		"path": "RecentApplicationLogs\\var\\log\\ACPController\\logs\\Channel_#_oplan.opl",
+		"filter_mode": "channel_number"
+	},
+	"channel_xml": 
+	{ 
+		"path": "RecentApplicationLogs\\var\\log\\ACPController\\logs\\Channel_#_channel_all_params.xml",
+		"filter_mode": "channel_number"
+	},
+	"transport_xml": 
+	{ 
+		"path": "RecentApplicationLogs\\var\\log\\ACPController\\logs\\transport_all_params.xml",
+		"filter_mode": "none"
+	},
+	"controller.log": 
+	{ 
+		"path": "RecentApplicationLogs\\var\\log\\ACPController\\logs\\controller.log",
+		"filter_mode": "time"
+	},
+	"dot_file": 
+	{ 
+		"path": "RecentApplicationLogs\\var\\log\\ACPController\\logs\\Channel_#_graph.dot",
+		"filter_mode": "channel_number"
+	},
+	"transcoder.log": 
+	{ 
+		"path": "ImportantLogs\\mnt\\sda7\\nmi\\log\\transcoder_logs.log",
+		"filter_mode": "pid"
+	},
+	"cellinfo_logs.log": 
+	{ 
+		"path": "ImportantLogs\\mnt\\sda7\\nmi\\log\\cellinfo_logs.log",
+		"filter_mode": "pid"
+	},
+	"channel.log": 
+	{ 
+		"path": "ImportantLogs\\var\\log\\ACPController\\logs\\Channel_#.log",
+		"filter_mode": "time"
+	}
 }
