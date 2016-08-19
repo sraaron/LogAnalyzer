@@ -4,6 +4,7 @@ import sys
 import json
 import string
 import zipfile
+from datetime import datetime, timedelta
 from cStringIO import StringIO
 
 class Filter(object):
@@ -15,6 +16,7 @@ class Filter(object):
         self.filename = arg["filename"]
         self.channel_number = arg["channel_number"]
         self.file_filter = {}
+        self.timestamp_filter_rv = False
         # print self.filename
         # print self.channel_number
 
@@ -73,20 +75,87 @@ class Filter(object):
                 pid = m.group(2)
         return pid
 
-    def filter_by_pid(self, file_path, pid):
-        pid = "P" + pid
-        with open(file_path, "r+") as f:
-            # need to read line by line as log files might be huge, and loading into memory will cause
-            # all the memory to be used up
-            # TO DO: speed optimization to load chunks of lines into memory
-            seek_count = 0
-            for line in f:
-                if pid in line:
-                    f.seek(seek_count)
-                    f.write(line)
-                    f.truncate()
-                    seek_count += len(line)
+    def get_timestamp(self, txt):
+        timestamp = ""
 
+        re1 = '((?:2|1)\\d{3}(?:-|\\/)(?:(?:0[1-9])|(?:1[0-2]))(?:-|\\/)(?:(?:0[1-9])|(?:[1-2][0-9])|(?:3[0-1]))' \
+              '(?:T|\\s)(?:(?:[0-1][0-9])|(?:2[0-3])):(?:[0-5][0-9]):(?:[0-5][0-9]))'  # Time Stamp 1
+        re2 = '(.|,)'  # Any Single Character 1
+        re3 = '(\\d)'  # Any Single Digit 1
+        re4 = '(\\d)'  # Any Single Digit 2
+        re5 = '(\\d)'  # Any Single Digit 3
+        rg = re.compile(re1 + re2 + re3 + re4 + re5, re.IGNORECASE | re.DOTALL)
+        m = rg.search(txt)
+
+        '''
+        # UTC time offset handling
+        re6 = '(\\+)'  # Any Single Character 2
+        re7 = '((?:(?:[0-1][0-9])|(?:[2][0-3])|(?:[0-9])):(?:[0-5][0-9])(?::[0-5][0-9])?)'  # HourMinuteSec 1
+        rg_utc = re.compile(re1 + re2 + re3 + re4 + re5 + re6 + re7, re.IGNORECASE | re.DOTALL)
+        m_utc = rg_utc.search(txt)
+        '''
+
+        if m:
+            timestamp1 = m.group(1)
+            c1 = m.group(2)
+            d1 = m.group(3)
+            d2 = m.group(4)
+            d3 = m.group(5)
+            timestamp = string.replace(timestamp1, "T", " ") + "." + d1 + d2 + d3
+            timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S.%f")
+            '''
+            # UTC time offset handling
+            if m_utc:
+                sign = m_utc.group(6)
+                time1 = m_utc.group(7)
+                utc_offset = timedelta(hours=int(time1[0:2]), minutes=int(time1[3:5]))
+                if sign == "+":
+                    timestamp += utc_offset
+                elif sign == "-":
+                    timestamp -= utc_offset
+            '''
+        return timestamp
+
+    def generic_filter(self, file_path, filter_func, get_start_stop_time=False, *filter_func_args):
+        start_time = 0
+        stop_time = 0
+        with open(file_path, "r+") as f:
+            # To DO: need to read line by line as log files might be huge, and loading into memory may cause
+            # all the memory to be used up
+            # TO DO: optimization (chunking of file)
+            lines = f.readlines()
+            f.seek(0)
+            for line in lines:
+                if line != "" and filter_func(line, *filter_func_args):
+                    if 0 == start_time:
+                        start_time = self.get_timestamp(line)
+                    else:
+                        stop_time = self.get_timestamp(line)
+                    f.write(line)
+            f.truncate()
+        return start_time, stop_time
+
+    def pid_filter(self, line, pid):
+        return pid in line
+
+    def filter_by_pid(self, file_path, pid, get_start_stop_time=False):
+        pid = "P" + pid
+        return self.generic_filter(file_path, self.pid_filter, get_start_stop_time, pid)
+
+    def timestamp_filter(self, line, start_time, stop_time):
+        # controller logs may start earlier compared to transcoder.log start time, need another way to find
+        # controller start time or set an offset (5 minutes?) before to get controller channel start time
+        log_timestamp = self.get_timestamp(line)
+        if log_timestamp != "":
+            if start_time <= log_timestamp <= stop_time:
+                self. timestamp_filter_rv = True
+            else:
+                self.timestamp_filter_rv = False
+        # return previously saved state if no timestamp in log
+        return self. timestamp_filter_rv
+
+    def filter_by_timestamp(self, file_path, start_time, stop_time):
+        return self.generic_filter(file_path, self.timestamp_filter, False, start_time, stop_time)
 
     def extract_files(self):
         cur_path = os.path.dirname(__file__)
@@ -98,16 +167,22 @@ class Filter(object):
     def log_filtering(self):
         # get channel pid
         channel_pid = self.get_pid(self.file_filter["oplan"]["path"])
-        # filter logs by channel pid
+
         if channel_pid > 0:
+            # get start/stop time of channel run (from transcoder.log)
+            start_time, stop_time = self.filter_by_pid(self.file_filter["transcoder.log"]["path"], channel_pid, True)
+            # set 5 minutes offset for start, stop time
+            start_time -= timedelta(minutes=5)
+            stop_time += timedelta(minutes=5)
             for key in self.file_filter:
-                if "pid" == self.file_filter[key]["filter_mode"]:
-                    self.filter_by_pid(self.file_filter[key]["path"], channel_pid)
-
-
-        # if no pid dumped in log, get start/stop time of channel run (from transcoder.log)
-        # extract logs within this time
-        return
+                    if key == "transcoder.log":
+                        continue
+                    # filter logs by channel pid
+                    if "pid" == self.file_filter[key]["filter_mode"]:
+                        self.filter_by_pid(self.file_filter[key]["path"], channel_pid)
+                    # extract logs within start/stop this time
+                    elif "time" == self.file_filter[key]["filter_mode"]:
+                        self.filter_by_timestamp(self.file_filter[key]["path"], start_time, stop_time)
 
 if __name__ == "__main__":
     Filter(sys.argv[1:])

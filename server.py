@@ -115,6 +115,7 @@ def preprocessing(params):
     filter_logs = Filter(params)
     filter_logs.filter_logs()
     # if template not available, generate template
+
     # extract features from log, using template
 
 # This class handles any incoming request from
