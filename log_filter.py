@@ -12,13 +12,32 @@ class Filter(object):
 
     def __init__(self, arg):
         super(Filter, self).__init__()
-        self.arg = arg
+        # self.arg = arg
         self.filename = arg["filename"]
         self.channel_number = arg["channel_number"]
-        self.file_filter = {}
         self.timestamp_filter_rv = False
+        self.cur_path = os.path.dirname(__file__)
+        self.techdump_file_path = os.path.join(self.cur_path, "techdumps", self.filename)
+        self.filter_settings_file_path = os.path.join(self.cur_path, "settings", "filter_settings.json")
+        self.filter_settings = self.convert_filter_settings(self.filter_settings_file_path,
+                                                            self.techdump_file_path, self.channel_number)
         # print self.filename
         # print self.channel_number
+
+    def convert_filter_settings(self, filter_settings_file_path, techdump_file_path, channel_number):
+        rv = {}
+        with open(filter_settings_file_path) as data_file:
+            filter_json = json.load(data_file)
+            techdump_file_path = os.path.splitext(techdump_file_path)[0]
+            rv = filter_json
+            for key in filter_json:
+                rv[key]["path"] = os.path.normpath(os.path.join(techdump_file_path,
+                                                                string.replace(filter_json[key]["path"], "#",
+                                                                               channel_number)))
+        return rv
+
+    def get_filter_settings(self):
+        return self.filter_settings
 
     def filter_logs(self):
         if self.channel_number > 0 and self.filename != "":
@@ -27,17 +46,6 @@ class Filter(object):
             # and we need the channel pid from oplan for filtering log
             self.extract_files()
             self.log_filtering()
-
-    def get_filter_settings(self, techdump_filepath, filter_settings_filepath):
-        rv = {}
-        with open(filter_settings_filepath) as data_file:
-            filter_json = json.load(data_file)
-            techdump_filepath = os.path.splitext(techdump_filepath)[0]
-            rv = filter_json
-            for key in filter_json:
-                rv[key]["path"] = os.path.normpath(os.path.join(techdump_filepath, string.replace(filter_json[key]["path"], "#",
-                                                                                          self.channel_number)))
-        return rv
 
     '''
     Implementation of a recursive zip file reader and extracter.
@@ -55,9 +63,10 @@ class Filter(object):
                         self.read_zip_file(z2_filedata, extract_dir_path)
                 else:
                     whole_file_path = os.path.normpath(os.path.join(extract_dir, file_path))
-                    for key in self.file_filter:
-                        if whole_file_path == self.file_filter[key]["path"]:
+                    for key in self.filter_settings:
+                        if whole_file_path == self.filter_settings[key]["path"]:
                             z.extract(file_path, extract_dir)
+
 
     def get_pid(self, oplan_file_path):
         pid = -1
@@ -74,6 +83,7 @@ class Filter(object):
                 # pid_word = m.group(1)
                 pid = m.group(2)
         return pid
+
 
     def get_timestamp(self, txt):
         timestamp = ""
@@ -158,31 +168,28 @@ class Filter(object):
         return self.generic_filter(file_path, self.timestamp_filter, False, start_time, stop_time)
 
     def extract_files(self):
-        cur_path = os.path.dirname(__file__)
-        techdump_filepath = os.path.join(cur_path, "techdumps", self.filename)
-        self.file_filter = self.get_filter_settings(techdump_filepath, os.path.join(cur_path, "settings", "filter_settings.json"))
-        extract_dir = os.path.dirname(techdump_filepath)
-        self.read_zip_file(techdump_filepath, extract_dir)
+        extract_dir = os.path.dirname(self.techdump_file_path)
+        self.read_zip_file(self.techdump_file_path, extract_dir)
 
     def log_filtering(self):
         # get channel pid
-        channel_pid = self.get_pid(self.file_filter["oplan"]["path"])
+        channel_pid = self.get_pid(self.filter_settings["oplan"]["path"])
 
         if channel_pid > 0:
             # get start/stop time of channel run (from transcoder.log)
-            start_time, stop_time = self.filter_by_pid(self.file_filter["transcoder.log"]["path"], channel_pid, True)
+            start_time, stop_time = self.filter_by_pid(self.filter_settings["transcoder.log"]["path"], channel_pid, True)
             # set 5 minutes offset for start, stop time
             start_time -= timedelta(minutes=5)
             stop_time += timedelta(minutes=5)
-            for key in self.file_filter:
+            for key in self.filter_settings:
                     if key == "transcoder.log":
                         continue
                     # filter logs by channel pid
-                    if "pid" == self.file_filter[key]["filter_mode"]:
-                        self.filter_by_pid(self.file_filter[key]["path"], channel_pid)
+                    if "pid" == self.filter_settings[key]["filter_mode"]:
+                        self.filter_by_pid(self.filter_settings[key]["path"], channel_pid)
                     # extract logs within start/stop this time
-                    elif "time" == self.file_filter[key]["filter_mode"]:
-                        self.filter_by_timestamp(self.file_filter[key]["path"], start_time, stop_time)
+                    elif "time" == self.filter_settings[key]["filter_mode"]:
+                        self.filter_by_timestamp(self.filter_settings[key]["path"], start_time, stop_time)
 
 if __name__ == "__main__":
     Filter(sys.argv[1:])

@@ -17,7 +17,8 @@
 	"controller.log": 
 	{ 
 		"path": "RecentApplicationLogs\\var\\log\\ACPController\\logs\\controller.log",
-		"filter_mode": "time"
+		"filter_mode": "time",
+		"component": "Controller"
 	},
 	"dot_file": 
 	{ 
@@ -27,7 +28,8 @@
 	"transcoder.log": 
 	{ 
 		"path": "ImportantLogs\\mnt\\sda7\\nmi\\log\\transcoder_logs.log",
-		"filter_mode": "pid"
+		"filter_mode": "pid",
+		"component": "RmpSpTranscodePack"
 	},
 	"cellinfo_logs.log": 
 	{ 
@@ -38,5 +40,10 @@
 	{ 
 		"path": "ImportantLogs\\var\\log\\ACPController\\logs\\Channel_#.log",
 		"filter_mode": "time"
+	},
+	"swversion": 
+	{ 
+		"path": "swversion",
+		"filter_mode": "none"
 	}
 }

@@ -1,0 +1,10 @@
+{
+	"trunk":
+	{
+		"RmpSpTranscodePack": "http://hsvn/svn/repo/NRMP/RmpSpTranscodePack/trunk/RmpSpTranscodePack/"		
+	},
+	"1.3.x.0":
+	{
+		"RmpSpTranscodePack": "http://hsvn/svn/repo/NRMP/RmpSpTranscodePack/branches/1.16.x.0/RmpSpTranscodePack/"		
+	}
+}

@@ -15,6 +15,7 @@ import posixpath
 import subprocess
 from os import curdir, sep
 from log_filter import Filter
+from templatizer import Templatizer
 from BaseHTTPServer import HTTPServer
 from SocketServer import ThreadingMixIn
 from SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -113,9 +114,11 @@ def train(command):
 def preprocessing(params):
     # filter the logs
     filter_logs = Filter(params)
+    filter_settings = filter_logs.get_filter_settings()
     filter_logs.filter_logs()
     # if template not available, generate template
-
+    templatizer = Templatizer(filter_settings=filter_settings)
+    templatizer.gen_template()
     # extract features from log, using template
 
 # This class handles any incoming request from
