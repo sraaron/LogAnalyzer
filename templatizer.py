@@ -1,7 +1,12 @@
 import os
 import re
+import csv
 import json
+import logging
 import subprocess
+
+logger = logging.getLogger(__name__)
+
 # traverse code repo
 # extract log message statements
 # convert log message statements into template
@@ -19,6 +24,7 @@ class Templatizer(object):
                                                                "component_branch_version.json")
         self.component_branch_version = {}
         self.component_template = {}
+        self.int_types = []
         with open(self.component_branch_version_file_path, "r") as f:
             self.component_branch_version = json.load(f)
 
@@ -35,20 +41,119 @@ class Templatizer(object):
             rv = True
         return rv
 
-    def debug_msg_arg_parser(self, debug_msg_arg):
+    def debug_level_to_val(self, debug_level):
+        debug_level_enum = {"L_EMERG": 0, "L_ALERT": 0, "L_CRITICAL": 2, "L_ERROR": 3, "L_WARN": 4, "L_NOTICE": 6,
+                            "L_INFO": 8, "DEFAULT_LOG_LEVEL": 8, "L_DEBUG": 10, "L_MAX_LEVEL": 12,
+                            "D_ALWAYS_PRINT": 0, "D_STAT_ERROR": 1, "D_STAT_NORMAL": 2, "D_ERROR": 3,
+                            "D_WARN": 4, "D_INFO": 8, "D_MAX_LEVEL": 12}
+        rv = 0
         try:
-            first_quote_pos = debug_msg_arg.find("\"")
-            last_quote_pos = debug_msg_arg.rfind("\"")
-            debug_string = debug_msg_arg[first_quote_pos+1:last_quote_pos].strip()
-            debug_area = debug_msg_arg[:first_quote_pos-1].split(",")[0].strip()
-            debug_level = debug_msg_arg[:first_quote_pos-1].split(",")[1].strip()
-            debug_variables = []
-            if len(debug_msg_arg) > last_quote_pos+2:
-                debug_variables = [s.strip() for s in debug_msg_arg[last_quote_pos+2:].split(",")]
+            if "+" in debug_level:
+                debug_level_split = debug_level.split("+")
+                rv = debug_level_enum[debug_level_split[0].strip()] + int(debug_level_split[1].strip())
+            elif debug_level in debug_level_enum:
+                rv = debug_level_enum[debug_level]
+            else:
+                # TO DO: need to handle direct integer values, integer variable values, c++ conditonal expressions
+                rv = 0
         except Exception as e:
-            print e
-            print debug_msg_arg
-        return [debug_area, debug_level, debug_string, debug_variables]
+            logger.error(e + " " + debug_level)
+        return str(rv)
+
+    def debug_string_to_regex(self, debug_string):
+        # Format Specification Syntax: https://msdn.microsoft.com/en-us/library/56e442dc.aspx
+        # Format Specification: http://www.cplusplus.com/reference/cstdio/printf/
+
+        for k, v in self.int_types:
+            if k in debug_string:
+                debug_string = re.sub('\"\s+?'+k+'\s+?\"?', v, debug_string)
+                #debug_string = debug_string.replace(k, v)
+
+        #hexadecmial floating point skipped (TO DO)
+        string_match = '((?:(\w|\W)*))'
+        char_match = '(.)'
+        int_match = '([-+]?\\d+)'
+        hex_match = '([0-9a-fA-F]+)'
+        floating_point = '([+-]?\\d*\\.\\d+)(?![-+0-9\\.])'
+        exponent_form = '(%s[+-]?%s)' % (floating_point, int_match)
+        shortest_form = '(%s)|(%s)' % (exponent_form, floating_point)
+        my_dict = {'d': int_match, 'i': int_match, 'u': int_match, 'x': hex_match, 'X': hex_match, 'f': floating_point,
+                   'F': floating_point, 'e': exponent_form, 'E': exponent_form, 'g': shortest_form, 'G': shortest_form,
+                   'c': char_match, 's': string_match, 'p': string_match}
+        flags = '[-+\s#0]'
+        width = '(\\d+|[*])'
+        precision = '(.\\d+|[*])'
+        length = '(hh|h|l|ll|j|z|t|L|I32|I64|I|w)'
+        specifier = '[diuoxXfFeEgGaAcspn%]'
+        cpp_format = '(%s(%s)?(%s)?(%s)?(%s)?(%s))' % ('%', flags, width, precision, length, specifier)
+
+        rg = re.compile(cpp_format)
+        # print debug_string
+        for i in set(rg.finditer(debug_string)):
+            debug_string = re.sub(cpp_format, my_dict[i.group(9)], debug_string)
+        # print debug_string
+        return debug_string
+
+    def populate_int_types(self, base_path):
+        re1 = '(#)'  # Any Single Character 1
+        re2 = '(define)'  # Word 1
+        re3 = '(\\s+)'  # White Space 1
+        re4 = '((?:[a-z][a-z]*[0-9]+[a-z0-9]*))'  # Alphanum 1
+        re5 = '(\\s+)'  # White Space 2
+        re6 = '(".*?")'  # Double Quote String 1
+        rg = re.compile(re1 + re2 + re3 + re4 + re5 + re6, re.IGNORECASE | re.DOTALL)
+        svn_path = base_path + "baselib/win32/inttypes.h"
+        int_types_cat = [s.strip() for s in subprocess.check_output(['svn', 'cat', svn_path]).splitlines()]
+        for line in int_types_cat:
+            m = rg.search(line)
+            if m:
+                int_type = m.group(4)
+                c_type = m.group(6).replace('"', '').strip()
+                self.int_types.append((int_type, c_type))
+
+
+    def get_debug_string(self, debug_msg):
+        start_pos = -1
+        end_pos = -1
+        specifier_check = False
+        quote_check = False
+        for idx, ch in enumerate(debug_msg):
+            if '"' == ch and start_pos == -1:
+                start_pos = idx
+            if specifier_check is True and ch == '"':
+                quote_check = True
+            else:
+                specifier_check = False
+            if quote_check is True and (ch == '"' or ch == '\\'):
+                quote_check = False
+            if ch == '%' or ch == '\\':
+                specifier_check = True
+            if (quote_check is False and ch == '"') or (quote_check is True and ch == ','):
+                end_pos = idx
+        return start_pos, end_pos
+
+    def debug_msg_arg_parser(self, debug_msg_arg):
+        debug_string = ""
+        debug_area = ""
+        debug_level_string = ""
+        debug_level_value = ""
+        debug_string_regex = ""
+        debug_variables = []
+        try:
+            #print debug_msg_arg
+            first_qpos, last_qpos = self.get_debug_string(debug_msg_arg)
+            debug_string = debug_msg_arg[first_qpos:last_qpos].strip()
+            debug_string_regex = self.debug_string_to_regex(debug_string)
+            debug_area = debug_msg_arg[:first_qpos-1].split(",")[0].strip()
+            debug_level_string = debug_msg_arg[:first_qpos - 1].split(",")[1].strip()
+            debug_level_value = self.debug_level_to_val(debug_level_string)
+            if len(debug_msg_arg) > last_qpos+1:
+                debug_variables = [s.strip() for s in debug_msg_arg[last_qpos+1:].split(",") if s.strip() != ""]
+        except Exception as e:
+            logger.error(str(e) + " " + debug_msg_arg)
+        return {"debug_area": debug_area, "debug_level_string": debug_level_string,
+                "debug_level_value": debug_level_value, "debug_string": debug_string,
+                "debug_variables": debug_variables, "debug_string_regex": debug_string_regex}
 
     def extract_transcode_pack_template(self, svn_path, component_template_path):
         if "RmpSpTranscodePack" not in self.component_template:
@@ -64,15 +169,12 @@ class Templatizer(object):
         for line in cpp_cat:
             if line == "" or line.startswith(r"//") or line.startswith("#"):
                 continue
-            if "DEBUG_MSG" in line or "DEBUG_MSG" in search_line:
+            if re.search(r'\bDEBUG_MSG\b', line) or re.search(r'\bDEBUG_MSG\b', search_line):
                 search_line += line
                 if search_line.endswith(";"):
                     m = rg.search(search_line)
                     if m:
-                        debug_msg_args = self.debug_msg_arg_parser(m.group(1)[1:len(m.group(1))-1])
-                        debug_msg_templates.append({"debug_area": debug_msg_args[0], "debug_level": debug_msg_args[1],
-                                                    "debug_string": debug_msg_args[2], "debug_variables":
-                                                        debug_msg_args[3]})
+                        debug_msg_templates.append(self.debug_msg_arg_parser(m.group(1)[1:len(m.group(1))-1]))
                         debug_msg_count += 1
                     search_line = ""
         if debug_msg_count > 0:
@@ -80,6 +182,8 @@ class Templatizer(object):
 
     def crawler(self, svn_path, component_template_path, component):
         svn_list = [s.strip() for s in subprocess.check_output(['svn', 'list', svn_path]).splitlines()]
+        if component == "RmpSpTranscodePack" and len(self.int_types) == 0:
+            self.populate_int_types(svn_path)
         for sub_path in svn_list:
             path = svn_path + sub_path
             if self.is_svn_dir(path):
