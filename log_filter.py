@@ -1,17 +1,23 @@
 import os
 import re
 import sys
+import util
 import json
 import string
 import zipfile
-from datetime import datetime, timedelta
+import logging
+from datetime import timedelta
 from cStringIO import StringIO
+
+logger = logging.getLogger(__name__)
+
 
 class Filter(object):
     """Filter will filter log information"""
 
     def __init__(self, arg):
         super(Filter, self).__init__()
+        logger.info("Initialize Filter")
         # self.arg = arg
         self.filename = arg["filename"]
         self.channel_number = arg["channel_number"]
@@ -84,48 +90,6 @@ class Filter(object):
                 pid = m.group(2)
         return pid
 
-
-    def get_timestamp(self, txt):
-        timestamp = ""
-
-        re1 = '((?:2|1)\\d{3}(?:-|\\/)(?:(?:0[1-9])|(?:1[0-2]))(?:-|\\/)(?:(?:0[1-9])|(?:[1-2][0-9])|(?:3[0-1]))' \
-              '(?:T|\\s)(?:(?:[0-1][0-9])|(?:2[0-3])):(?:[0-5][0-9]):(?:[0-5][0-9]))'  # Time Stamp 1
-        re2 = '(.|,)'  # Any Single Character 1
-        re3 = '(\\d)'  # Any Single Digit 1
-        re4 = '(\\d)'  # Any Single Digit 2
-        re5 = '(\\d)'  # Any Single Digit 3
-        rg = re.compile(re1 + re2 + re3 + re4 + re5, re.IGNORECASE | re.DOTALL)
-        m = rg.search(txt)
-
-        '''
-        # UTC time offset handling
-        re6 = '(\\+)'  # Any Single Character 2
-        re7 = '((?:(?:[0-1][0-9])|(?:[2][0-3])|(?:[0-9])):(?:[0-5][0-9])(?::[0-5][0-9])?)'  # HourMinuteSec 1
-        rg_utc = re.compile(re1 + re2 + re3 + re4 + re5 + re6 + re7, re.IGNORECASE | re.DOTALL)
-        m_utc = rg_utc.search(txt)
-        '''
-
-        if m:
-            timestamp1 = m.group(1)
-            c1 = m.group(2)
-            d1 = m.group(3)
-            d2 = m.group(4)
-            d3 = m.group(5)
-            timestamp = string.replace(timestamp1, "T", " ") + "." + d1 + d2 + d3
-            timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S.%f")
-            '''
-            # UTC time offset handling
-            if m_utc:
-                sign = m_utc.group(6)
-                time1 = m_utc.group(7)
-                utc_offset = timedelta(hours=int(time1[0:2]), minutes=int(time1[3:5]))
-                if sign == "+":
-                    timestamp += utc_offset
-                elif sign == "-":
-                    timestamp -= utc_offset
-            '''
-        return timestamp
-
     def generic_filter(self, file_path, filter_func, get_start_stop_time=False, *filter_func_args):
         start_time = 0
         stop_time = 0
@@ -138,9 +102,9 @@ class Filter(object):
             for line in lines:
                 if line != "" and filter_func(line, *filter_func_args):
                     if 0 == start_time:
-                        start_time = self.get_timestamp(line)
+                        start_time = util.get_timestamp(line)
                     else:
-                        stop_time = self.get_timestamp(line)
+                        stop_time = util.get_timestamp(line)
                     f.write(line)
             f.truncate()
         return start_time, stop_time
@@ -155,7 +119,7 @@ class Filter(object):
     def timestamp_filter(self, line, start_time, stop_time):
         # controller logs may start earlier compared to transcoder.log start time, need another way to find
         # controller start time or set an offset (5 minutes?) before to get controller channel start time
-        log_timestamp = self.get_timestamp(line)
+        log_timestamp = util.get_timestamp(line)
         if log_timestamp != "":
             if start_time <= log_timestamp <= stop_time:
                 self. timestamp_filter_rv = True

@@ -1,6 +1,5 @@
 import os
 import re
-import csv
 import json
 import logging
 import subprocess
@@ -17,6 +16,7 @@ class Templatizer(object):
     """Create log message template based on code repo"""
 
     def __init__(self, filter_settings):
+        logger.info("Initialize Templatizer")
         self.filter_settings = filter_settings
         self.cur_path = os.path.dirname(__file__)
         self.templates_path = os.path.join(self.cur_path, "templates")
@@ -54,23 +54,25 @@ class Templatizer(object):
             elif debug_level in debug_level_enum:
                 rv = debug_level_enum[debug_level]
             else:
-                # TO DO: need to handle direct integer values, integer variable values, c++ conditonal expressions
+                # TO DO: need to handle direct integer values, integer variable values, c++ conditional expressions
                 rv = 0
         except Exception as e:
             logger.error(e + " " + debug_level)
         return str(rv)
 
+    def int_types_to_ctypes(self, debug_string):
+        for k, v in self.int_types:
+            if k in debug_string:
+                debug_string = re.sub('\"\s+?' + k + '\s+?\"?', v, debug_string)
+        return debug_string
+
     def debug_string_to_regex(self, debug_string):
         # Format Specification Syntax: https://msdn.microsoft.com/en-us/library/56e442dc.aspx
         # Format Specification: http://www.cplusplus.com/reference/cstdio/printf/
 
-        for k, v in self.int_types:
-            if k in debug_string:
-                debug_string = re.sub('\"\s+?'+k+'\s+?\"?', v, debug_string)
-                #debug_string = debug_string.replace(k, v)
-
         #hexadecmial floating point skipped (TO DO)
-        string_match = '((?:(\w|\W)*))'
+        #string_match = '((?:(\w|\W)*))'
+        string_match = '(.*)'
         char_match = '(.)'
         int_match = '([-+]?\\d+)'
         hex_match = '([0-9a-fA-F]+)'
@@ -86,12 +88,23 @@ class Templatizer(object):
         length = '(hh|h|l|ll|j|z|t|L|I32|I64|I|w)'
         specifier = '[diuoxXfFeEgGaAcspn%]'
         cpp_format = '(%s(%s)?(%s)?(%s)?(%s)?(%s))' % ('%', flags, width, precision, length, specifier)
-
         rg = re.compile(cpp_format)
-        # print debug_string
-        for i in set(rg.finditer(debug_string)):
-            debug_string = re.sub(cpp_format, my_dict[i.group(9)], debug_string)
-        # print debug_string
+
+        if "[%s] Plugin is stopping.\\n" in debug_string:
+            print "GOTCHA!"
+        # escape regex meta-characters in existing debug message
+        debug_list = re.split(cpp_format, debug_string)
+        if len(debug_list) > 1:
+            debug_string = ""
+            for idx in range(0, len(debug_list), 10):
+                debug_string += re.escape(debug_list[idx])
+                if idx + 1 < len(debug_list):
+                    debug_string += debug_list[idx]
+            # print debug_string
+            for i in set(rg.finditer(debug_string)):
+                specifier_format = '(%s(%s)?(%s)?(%s)?(%s)?(%s))' % ('%', flags, width, precision, length, i.group(9))
+                debug_string = re.sub(specifier_format, my_dict[i.group(9)], debug_string)
+            # print debug_string
         return debug_string
 
     def populate_int_types(self, base_path):
@@ -111,27 +124,6 @@ class Templatizer(object):
                 c_type = m.group(6).replace('"', '').strip()
                 self.int_types.append((int_type, c_type))
 
-
-    def get_debug_string(self, debug_msg):
-        start_pos = -1
-        end_pos = -1
-        specifier_check = False
-        quote_check = False
-        for idx, ch in enumerate(debug_msg):
-            if '"' == ch and start_pos == -1:
-                start_pos = idx
-            if specifier_check is True and ch == '"':
-                quote_check = True
-            else:
-                specifier_check = False
-            if quote_check is True and (ch == '"' or ch == '\\'):
-                quote_check = False
-            if ch == '%' or ch == '\\':
-                specifier_check = True
-            if (quote_check is False and ch == '"') or (quote_check is True and ch == ','):
-                end_pos = idx
-        return start_pos, end_pos
-
     def debug_msg_arg_parser(self, debug_msg_arg):
         debug_string = ""
         debug_area = ""
@@ -140,15 +132,13 @@ class Templatizer(object):
         debug_string_regex = ""
         debug_variables = []
         try:
-            #print debug_msg_arg
-            first_qpos, last_qpos = self.get_debug_string(debug_msg_arg)
-            debug_string = debug_msg_arg[first_qpos:last_qpos].strip()
-            debug_string_regex = self.debug_string_to_regex(debug_string)
-            debug_area = debug_msg_arg[:first_qpos-1].split(",")[0].strip()
-            debug_level_string = debug_msg_arg[:first_qpos - 1].split(",")[1].strip()
+            debug_msg_arg = self.int_types_to_ctypes(debug_msg_arg)
+            data = re.compile(r'''((?:[^,"']|"[^"]*"|'[^']*')+)''').split(debug_msg_arg)[1::2]
+            debug_area, debug_level_string, debug_string,  = data[0].strip(), data[1].strip(), data[2].\
+                strip().replace('"', '')
+            debug_variables = [x.strip() for x in data[3:]]
             debug_level_value = self.debug_level_to_val(debug_level_string)
-            if len(debug_msg_arg) > last_qpos+1:
-                debug_variables = [s.strip() for s in debug_msg_arg[last_qpos+1:].split(",") if s.strip() != ""]
+            debug_string_regex = self.debug_string_to_regex(debug_string)
         except Exception as e:
             logger.error(str(e) + " " + debug_msg_arg)
         return {"debug_area": debug_area, "debug_level_string": debug_level_string,
@@ -191,16 +181,22 @@ class Templatizer(object):
             elif self.is_cpp(path):
                 if component == "RmpSpTranscodePack":
                     self.extract_transcode_pack_template(path, component_template_path)
+                else:
+                    self.component_template[component] = {}
 
     def gen_template(self):
         version, build_number = self.get_swversion()
         branch = self.version_to_branch_mapping(version)
         for component, path in self.component_branch_version[branch].iteritems():
             component_template_path = os.path.join(self.templates_path, branch + "_" + component + ".json")
-            # if not os.path.exists(component_template_path):
-            self.crawler(path, component_template_path, component)
-            with open(component_template_path, "w") as f:
-                json.dump(self.component_template[component], f, indent=2)
+            if not os.path.exists(component_template_path):
+                self.crawler(path, component_template_path, component)
+                with open(component_template_path, "w") as f:
+                    json.dump(self.component_template[component], f, indent=2)
+            else:
+                with open(component_template_path, "r") as f:
+                    self.component_template[component] = json.load(f)
+        return self.component_template
 
     def version_to_branch_mapping(self, version):
         branch = ""
@@ -239,12 +235,7 @@ class Templatizer(object):
                     rg = re.compile(re1 + re2 + re3 + re4 + re5 + re6 + re7 + re8 + re9 + re10, re.IGNORECASE | re.DOTALL)
                     m = rg.search(txt)
                     if m:
-                        word1 = m.group(1)
-                        word2 = m.group(2)
-                        c1 = m.group(3)
                         version_number = m.group(4)
-                        word3 = m.group(5)
-                        c2 = m.group(6)
                         build_number = m.group(7)
                         rv = version_number, build_number
                 break

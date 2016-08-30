@@ -16,6 +16,7 @@ import subprocess
 from os import curdir, sep
 from log_filter import Filter
 from templatizer import Templatizer
+from feature_extractor import FeatureExtractor
 from BaseHTTPServer import HTTPServer
 from SocketServer import ThreadingMixIn
 from SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -116,10 +117,16 @@ def preprocessing(params):
     filter_logs = Filter(params)
     filter_settings = filter_logs.get_filter_settings()
     filter_logs.filter_logs()
-    # if template not available, generate template
+    # if template file not available, generate template
+    # filter settings needed to get svn branch path for particular version
+    # currently accesses svn server directly, TO DO: have local back up copy in case svn server is down?
     templatizer = Templatizer(filter_settings=filter_settings)
-    templatizer.gen_template()
+    component_template = templatizer.gen_template()
     # extract features from log, using template
+    extractor = FeatureExtractor(component_template=component_template, techdump_filename=params['filename'],
+                                  filter_settings=filter_settings)
+    extractor.extract_features()
+
 
 # This class handles any incoming request from
 # the browser
