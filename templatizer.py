@@ -1,5 +1,6 @@
 import os
 import re
+import util
 import json
 import logging
 import subprocess
@@ -57,55 +58,58 @@ class Templatizer(object):
                 # TO DO: need to handle direct integer values, integer variable values, c++ conditional expressions
                 rv = 0
         except Exception as e:
-            logger.error(e + " " + debug_level)
+            logger.exception(debug_level)
         return str(rv)
 
     def int_types_to_ctypes(self, debug_string):
         for k, v in self.int_types:
             if k in debug_string:
-                debug_string = re.sub('\"\s+?' + k + '\s+?\"?', v, debug_string)
+                debug_string = re.sub('\"\s*' + k + '\s*\"', v, debug_string)  # match zero or more space occurrences
         return debug_string
 
     def debug_string_to_regex(self, debug_string):
+        valid = False
         # Format Specification Syntax: https://msdn.microsoft.com/en-us/library/56e442dc.aspx
         # Format Specification: http://www.cplusplus.com/reference/cstdio/printf/
-
-        #hexadecmial floating point skipped (TO DO)
-        #string_match = '((?:(\w|\W)*))'
-        string_match = '(.*)'
-        char_match = '(.)'
+        debug_string = debug_string.rstrip("\n").rstrip("\\n")
+        # hexadecmial floating point skipped (TO DO)
         int_match = '([-+]?\\d+)'
-        hex_match = '([0-9a-fA-F]+)'
+        unsigned_int_match = '(\\d+)'
+        octal_match = '([0-7]{1,3})'
+        lower_case_hex_match = '([0-9a-f]+)'
+        upper_case_hex_match = '([0-9A-F]+)'
         floating_point = '([+-]?\\d*\\.\\d+)(?![-+0-9\\.])'
         exponent_form = '(%s[+-]?%s)' % (floating_point, int_match)
         shortest_form = '(%s)|(%s)' % (exponent_form, floating_point)
-        my_dict = {'d': int_match, 'i': int_match, 'u': int_match, 'x': hex_match, 'X': hex_match, 'f': floating_point,
-                   'F': floating_point, 'e': exponent_form, 'E': exponent_form, 'g': shortest_form, 'G': shortest_form,
-                   'c': char_match, 's': string_match, 'p': string_match}
+        char_match = '(.)'
+        string_match = '(.*)'
+        cpp_specifier_match_dict = {'d': int_match, 'i': int_match, 'u': unsigned_int_match, 'x': lower_case_hex_match,
+                   'X': upper_case_hex_match, 'f': floating_point, 'F': floating_point, 'e': exponent_form,
+                   'E': exponent_form, 'g': shortest_form, 'G': shortest_form, 'c': char_match, 's': string_match,
+                   'p': string_match, '%': char_match, 'o': octal_match}
         flags = '[-+\s#0]'
         width = '(\\d+|[*])'
-        precision = '(.\\d+|[*])'
+        precision = '([.]\\d+|[*])'
         length = '(hh|h|l|ll|j|z|t|L|I32|I64|I|w)'
         specifier = '[diuoxXfFeEgGaAcspn%]'
-        cpp_format = '(%s(%s)?(%s)?(%s)?(%s)?(%s))' % ('%', flags, width, precision, length, specifier)
-        rg = re.compile(cpp_format)
-
-        if "[%s] Plugin is stopping.\\n" in debug_string:
-            print "GOTCHA!"
+        cpp_specifier_format = '(%s(%s)?(%s)?(%s)?(%s)?(%s))' % ('%', flags, width, precision, length, specifier)
+        rg = re.compile(cpp_specifier_format)
         # escape regex meta-characters in existing debug message
-        debug_list = re.split(cpp_format, debug_string)
-        if len(debug_list) > 1:
+        debug_list = re.split(cpp_specifier_format, debug_string)
+        if len(debug_list) > 0:
+            if len(debug_list) < 12 and debug_list[0] == "":  # check if only single
+                return "", valid
             debug_string = ""
             for idx in range(0, len(debug_list), 10):
-                debug_string += re.escape(debug_list[idx])
-                if idx + 1 < len(debug_list):
-                    debug_string += debug_list[idx]
+                debug_string += util.escape(debug_list[idx])
+                if len(debug_list) > 1 and idx + 1 < len(debug_list):
+                    debug_string += debug_list[idx + 1]
             # print debug_string
             for i in set(rg.finditer(debug_string)):
                 specifier_format = '(%s(%s)?(%s)?(%s)?(%s)?(%s))' % ('%', flags, width, precision, length, i.group(9))
-                debug_string = re.sub(specifier_format, my_dict[i.group(9)], debug_string)
+                debug_string = re.sub(specifier_format, cpp_specifier_match_dict[i.group(9)], debug_string)
             # print debug_string
-        return debug_string
+        return debug_string, True
 
     def populate_int_types(self, base_path):
         re1 = '(#)'  # Any Single Character 1
@@ -138,9 +142,11 @@ class Templatizer(object):
                 strip().replace('"', '')
             debug_variables = [x.strip() for x in data[3:]]
             debug_level_value = self.debug_level_to_val(debug_level_string)
-            debug_string_regex = self.debug_string_to_regex(debug_string)
+            debug_string_regex, valid = self.debug_string_to_regex(debug_string)
+            if valid is False:
+                return None
         except Exception as e:
-            logger.error(str(e) + " " + debug_msg_arg)
+            logger.exception(debug_msg_arg)
         return {"debug_area": debug_area, "debug_level_string": debug_level_string,
                 "debug_level_value": debug_level_value, "debug_string": debug_string,
                 "debug_variables": debug_variables, "debug_string_regex": debug_string_regex}
@@ -164,8 +170,10 @@ class Templatizer(object):
                 if search_line.endswith(";"):
                     m = rg.search(search_line)
                     if m:
-                        debug_msg_templates.append(self.debug_msg_arg_parser(m.group(1)[1:len(m.group(1))-1]))
-                        debug_msg_count += 1
+                        template = self.debug_msg_arg_parser(m.group(1)[1:len(m.group(1))-1])
+                        if template is not None:
+                            debug_msg_templates.append(template)
+                            debug_msg_count += 1
                     search_line = ""
         if debug_msg_count > 0:
             self.component_template["RmpSpTranscodePack"][cpp_file_name] = debug_msg_templates

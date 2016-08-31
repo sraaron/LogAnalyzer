@@ -1,6 +1,18 @@
 import re
+import ast
 import string
 from datetime import datetime, timedelta
+
+_alphanum = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+
+def tryeval(val):
+    try:
+        val = ast.literal_eval(val)
+    except:
+        pass
+    return val
 
 
 def get_timestamp_regex(get_utc=False):
@@ -19,6 +31,18 @@ def get_timestamp_regex(get_utc=False):
     else:
         rg = re.compile(re1 + re2 + re3 + re4 + re5, re.IGNORECASE | re.DOTALL)
     return rg
+
+
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+
+    if isinstance(obj, datetime):
+        serial = obj.isoformat()
+        return serial
+    raise TypeError("Type not serializable")
+
+def timestamp_to_string(timestamp, utc=None):
+    return timestamp.strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 def get_timestamp(txt, get_utc=False):
@@ -44,3 +68,18 @@ def get_timestamp(txt, get_utc=False):
             elif sign == "-":
                 timestamp -= utc_offset
     return timestamp
+
+
+def escape(pattern):
+    """Escape all non-alphanumeric characters in pattern."""
+    s = list(pattern)
+    alphanum = _alphanum
+    for i, c in enumerate(pattern):
+        if c == " ":
+            continue
+        if c not in alphanum:
+            if c == "\000":  # skip escape for "_"
+                s[i] = "\\000"
+            else:
+                s[i] = "\\" + c
+    return pattern[:0].join(s)
