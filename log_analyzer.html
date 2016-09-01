@@ -124,7 +124,7 @@
 					<div class="form-group">
 						<label class="col-md-4 control-label" for="channel_number">LABEL</label>
 						<div class="col-md-4">
-						  <select id="channel_number" name="channel_number" class="form-control">
+						  <select id="training_label" name="training_label" class="form-control">
 							<option value="1">CC</option>					
 						  </select>
 						</div>						
@@ -327,10 +327,16 @@ Frontend
     {		
 		var filename = ""
 		var channel = "1"
+		var training_label_value = "CC"
 		
 		$('#channel_number').on('change', function()
 		{
 			channel = $(this).val()
+		});
+		
+		$('#training_label').on('change', function()
+		{
+			training_label_value = $(this).val()
 		});
 		
 		
@@ -425,10 +431,22 @@ Frontend
 		
 		$('#analyze').click(function()
         {
-            var params = {};
+            var params = {};			
 			params['channel_number'] = channel
 			params['filename'] = filename
 			operation('analyze', params, function(res)
+            {
+                notify(res);                
+            });
+        });
+		
+		$('#train').click(function()
+        {
+            var params = {};			
+			params['channel_number'] = channel
+			params['filename'] = filename
+			params['training_label'] = training_label_value
+			operation('train', params, function(res)
             {
                 notify(res);                
             });

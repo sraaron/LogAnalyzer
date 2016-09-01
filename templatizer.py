@@ -96,12 +96,14 @@ class Templatizer(object):
         rg = re.compile(cpp_specifier_format)
         # escape regex meta-characters in existing debug message
         debug_list = re.split(cpp_specifier_format, debug_string)
+        only_debug_string = ""
         if len(debug_list) > 0:
             if len(debug_list) < 12 and debug_list[0] == "":  # check if only single
-                return "", valid
+                return "", "", valid
             debug_string = ""
             for idx in range(0, len(debug_list), 10):
                 debug_string += util.escape(debug_list[idx])
+                only_debug_string += util.escape(debug_list[idx])
                 if len(debug_list) > 1 and idx + 1 < len(debug_list):
                     debug_string += debug_list[idx + 1]
             # print debug_string
@@ -109,7 +111,7 @@ class Templatizer(object):
                 specifier_format = '(%s(%s)?(%s)?(%s)?(%s)?(%s))' % ('%', flags, width, precision, length, i.group(9))
                 debug_string = re.sub(specifier_format, cpp_specifier_match_dict[i.group(9)], debug_string)
             # print debug_string
-        return debug_string, True
+        return only_debug_string, debug_string, True
 
     def populate_int_types(self, base_path):
         re1 = '(#)'  # Any Single Character 1
@@ -134,6 +136,7 @@ class Templatizer(object):
         debug_level_string = ""
         debug_level_value = ""
         debug_string_regex = ""
+        only_debug_string = ""
         debug_variables = []
         try:
             debug_msg_arg = self.int_types_to_ctypes(debug_msg_arg)
@@ -142,14 +145,15 @@ class Templatizer(object):
                 strip().replace('"', '')
             debug_variables = [x.strip() for x in data[3:]]
             debug_level_value = self.debug_level_to_val(debug_level_string)
-            debug_string_regex, valid = self.debug_string_to_regex(debug_string)
+            only_debug_string, debug_string_regex, valid = self.debug_string_to_regex(debug_string)
             if valid is False:
                 return None
         except Exception as e:
             logger.exception(debug_msg_arg)
-        return {"debug_area": debug_area, "debug_level_string": debug_level_string,
-                "debug_level_value": debug_level_value, "debug_string": debug_string,
-                "debug_variables": debug_variables, "debug_string_regex": debug_string_regex}
+        return {"only_debug_string": only_debug_string, "debug_area": debug_area,
+                "debug_level_string": debug_level_string, "debug_level_value": debug_level_value,
+                "debug_string": debug_string, "debug_variables": debug_variables,
+                "debug_string_regex": debug_string_regex}
 
     def extract_transcode_pack_template(self, svn_path, component_template_path):
         if "RmpSpTranscodePack" not in self.component_template:

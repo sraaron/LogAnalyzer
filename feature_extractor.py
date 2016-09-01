@@ -32,6 +32,7 @@ class FeatureExtractor(object):
             json.dump(analysis, f, indent=2)
 
     def extract_features(self):
+        output_analysis = {}
         for log_file, log_file_settings in self.filter_settings.iteritems():
             if "component" in log_file_settings:
                 log_file_path = os.path.join(self.techdump_folder_path, log_file_settings["path"])
@@ -39,8 +40,10 @@ class FeatureExtractor(object):
                 if component in self.component_template:
                     template = self.component_template[component]
                     if component == "RmpSpTranscodePack":
-                        self.dump_analysis(analysis=self.extract_transcode_pack_features(log_file_path=log_file_path,
-                                                                                         template=template),
-                                           log_filename=os.path.splitext(os.path.basename(log_file_path))[0])
-        print "Done!"
+                        output_analysis[component] = self.extract_transcode_pack_features(log_file_path=log_file_path,
+                                                                                          template=template)
 
+                        self.dump_analysis(analysis=output_analysis[component],
+                                           log_filename=os.path.splitext(os.path.basename(log_file_path))[0])
+
+        return output_analysis

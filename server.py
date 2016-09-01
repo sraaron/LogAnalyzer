@@ -109,7 +109,15 @@ def analyze(command):
 
 
 def train(command):
-    print command
+    params = json.loads(command)
+    training_label = params['training_label']
+    feature_set, ml_input_data_set = preprocessing(params)
+    training(training_label, feature_set, ml_input_data_set)
+
+
+def training(training_label, feature_set, ml_input_data_set):
+
+    return
 
 
 def preprocessing(params):
@@ -125,7 +133,7 @@ def preprocessing(params):
     # extract features from log, using template
     extractor = FeatureExtractor(component_template=component_template, techdump_filename=params['filename'],
                                   filter_settings=filter_settings)
-    extractor.extract_features()
+    return component_template, extractor.extract_features()
 
 
 # This class handles any incoming request from

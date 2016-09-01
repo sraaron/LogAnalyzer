@@ -12,7 +12,8 @@ class TranscoderLogParser(object):
         self.first_timestamp = None
 
     def parse_debug_msg(self, cpp_name, debug_msg):
-        rv = {}
+        rv_dict = {}
+        rv = "", rv_dict
         debug_msg = debug_msg.rstrip("\n").rstrip("\\n")
         if self.debug_msg_template is not None and cpp_name in self.debug_msg_template:
             for debug_msg_template in self.debug_msg_template[cpp_name]:
@@ -25,7 +26,9 @@ class TranscoderLogParser(object):
                         # rv["variables"] = {}
                         for idx, variable_name in enumerate(debug_msg_template["debug_variables"]):
                             # rv["variables"][variable_name] = m.group(idx)
-                            rv[variable_name] = util.tryeval(m.group(idx+1))
+                            rv_dict[variable_name] = util.tryeval(m.group(idx+1))
+                        rv = debug_msg_template["only_debug_string"], rv_dict
+                        break  # break on first match, expect only one unique match
                 except Exception as e:
                     logger.exception(debug_msg + regex_match)
         return rv
@@ -61,6 +64,7 @@ class TranscoderLogParser(object):
                         rv[cpp_name].append({timedelta: {"level": level, "function_name": sbraces[0],
                                                          "line_number": int(sbraces[2]), "debug_msg": debug_msg}})
                         if parse_debug_msg:
+                            rv[cpp_name][len(rv[cpp_name]) - 1][timedelta]["only_debug_string"], \
                             rv[cpp_name][len(rv[cpp_name]) - 1][timedelta]["variables"] = \
                                 self.parse_debug_msg(cpp_name, debug_msg)
                     except Exception as e:
