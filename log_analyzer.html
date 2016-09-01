@@ -111,7 +111,7 @@
 					<input id="toggle_test_train" type="checkbox" checked data-toggle="toggle" data-on="TEST" data-off="TRAIN"  data-onstyle="primary" data-offstyle="info" class="checkbox">
 				<button id="analyze" class="btn btn-default">
 					<span>Analyze</span> <span class="glyphicon glyphicon-play-circle"></span>
-				</button>	
+				</button>
 				<div id="upload_techdump_progress" class="progress"><div class="progress-bar"></div></div>
             </div>
           </div>
@@ -133,6 +133,9 @@
 				<input id="toggle_good_bad" type="checkbox" checked data-toggle="toggle" data-on="GOOD" data-off="BAD" data-onstyle="success" data-offstyle="danger" class="checkbox">
 				<button id="train" class="btn btn-default">
 					<span>Train</span> <span class="glyphicon glyphicon-road"></span>
+				</button>
+				<button id="train_with_txt_btn" class="btn btn-default">
+					<span>Train using TXT Result</span> <span class="glyphicon glyphicon-road"></span>
 				</button>
 			</div>
           </div>
@@ -191,6 +194,35 @@ Frontend
 
     </div><!--tabs-->
 
+    <div id="train_with_txt_dialog" class="modal fade" role="dialog">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            <h4 class="modal-title">Train with TXT</h4>
+          </div>
+          <div class="modal-body">
+            <form>
+              <div class="form-group">
+                <label>Start TXT Result Directory Path</label>
+                <input type="text" class="form-control" name="start_txt_path">
+              </div>              
+			  <div class="form-group">
+                <label>End TXT Result Directory Path</label>
+                <input type="text" class="form-control" name="end_txt_path">
+              </div>
+			  <div class="form-group">
+                <label>Channel Number</label>
+                <input type="text" class="form-control" name="channel_number_dialog">
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary action">Train with TXT</button>
+          </div>
+        </div>
+      </div>
+    </div><!--train_with_txt_dialog-->	
 
     <script src="js/jquery.min.js"></script>
     <script src="js/bootstrap.min.js"></script>
@@ -273,53 +305,22 @@ Frontend
             {
             }
         },
-        /*
+        
 		dialogs:
         {
-            'stream_dialog':
+            'train_with_txt_dialog':
             {
-                action: function (asset, mcast, loop)
+                action: function (start_txt_path, end_txt_path, channel_number)
                 {
-                    var addr = mcast.split(':')[0];
-                    var port = mcast.split(':')[1];
-                    var loop = loop ? 1:0;
-                    if( asset.indexOf(".pcap") == -1) {
-                        operation('stream', {
-                            asset: asset,
-                            addr: addr,
-                            port: port,
-                            loop: loop
+						operation('train_with_txt', {
+                            start_txt_path: start_txt_path,
+                            end_txt_path: end_txt_path,
+							channel_number: channel_number
                         }, notify);
-                    } else {
-                        operation('stream', {
-                            asset: asset,
-                            loop: loop
-                        }, notify);
-                    }
                     return true;
                 }
-            },
-            'capture_dialog':
-            {
-                action: function (mcast, duration, cap)
-                {
-                    var addr = mcast.split(':')[0];
-                    var port = mcast.split(':')[1];
-                    var duration = parseInt(duration);
-                    var cap = cap ? 1:0;
-                    operation('capture', {
-                        addr: addr,
-                        port: port,
-                        duration: duration,
-                        cap: cap
-                    }, function(res) {
-                        capturing[res['ID']] = true;
-                        notify(res);
-                    });
-                    return true;
-                }
-            }
-        }*/
+            }            
+        }
     });
     setup_functions();	
 
@@ -337,8 +338,12 @@ Frontend
 		$('#training_label').on('change', function()
 		{
 			training_label_value = $(this).val()
-		});
+		});		
 		
+		$('#train_with_txt_btn').click(function()
+        {
+            $('#train_with_txt_dialog').modal();
+        });
 		
 		$('#upload_techdump').on('change', function(event)
         {

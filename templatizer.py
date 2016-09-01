@@ -16,9 +16,10 @@ logger = logging.getLogger(__name__)
 class Templatizer(object):
     """Create log message template based on code repo"""
 
-    def __init__(self, filter_settings):
+    def __init__(self, filter_settings=None, acp_version=None):
         logger.info("Initialize Templatizer")
         self.filter_settings = filter_settings
+        self.acp_version = acp_version
         self.cur_path = os.path.dirname(__file__)
         self.templates_path = os.path.join(self.cur_path, "templates")
         self.component_branch_version_file_path = os.path.join(self.cur_path, "settings",
@@ -94,9 +95,10 @@ class Templatizer(object):
         specifier = '[diuoxXfFeEgGaAcspn%]'
         cpp_specifier_format = '(%s(%s)?(%s)?(%s)?(%s)?(%s))' % ('%', flags, width, precision, length, specifier)
         rg = re.compile(cpp_specifier_format)
+        only_debug_string = ""
+
         # escape regex meta-characters in existing debug message
         debug_list = re.split(cpp_specifier_format, debug_string)
-        only_debug_string = ""
         if len(debug_list) > 0:
             if len(debug_list) < 12 and debug_list[0] == "":  # check if only single
                 return "", "", valid
@@ -149,6 +151,7 @@ class Templatizer(object):
             if valid is False:
                 return None
         except Exception as e:
+            print e
             logger.exception(debug_msg_arg)
         return {"only_debug_string": only_debug_string, "debug_area": debug_area,
                 "debug_level_string": debug_level_string, "debug_level_value": debug_level_value,
@@ -169,12 +172,16 @@ class Templatizer(object):
         for line in cpp_cat:
             if line == "" or line.startswith(r"//") or line.startswith("#"):
                 continue
-            if re.search(r'\bDEBUG_MSG\b', line) or re.search(r'\bDEBUG_MSG\b', search_line):
+            if re.search(r'\bDEBUG_MSG\b', line) or re.search(r'\bDEBUG_MSG\b', search_line) or \
+                    re.search(r'\bDEBUG_LOGMSG\b', line) or re.search(r'\bDEBUG_LOGMSG\b', search_line):
                 search_line += line
                 if search_line.endswith(";"):
-                    m = rg.search(search_line)
+                    m = rg.search(search_line)  # get everything inside round brackets
                     if m:
-                        template = self.debug_msg_arg_parser(m.group(1)[1:len(m.group(1))-1])
+                        no_round_brackets = m.group(1)[1:len(m.group(1))-1] # remove round brackets
+                        if re.search(r'\bDEBUG_LOGMSG\b', line) or re.search(r'\bDEBUG_LOGMSG\b', search_line):
+                            no_round_brackets = ",".join(no_round_brackets.split(',')[1:])  # remove first argument
+                        template = self.debug_msg_arg_parser(no_round_brackets)
                         if template is not None:
                             debug_msg_templates.append(template)
                             debug_msg_count += 1
@@ -197,7 +204,10 @@ class Templatizer(object):
                     self.component_template[component] = {}
 
     def gen_template(self):
-        version, build_number = self.get_swversion()
+        if self.acp_version is None:
+            version, build_number = self.get_swversion()
+        else:
+            version = self.acp_version[:self.acp_version.rfind('.')]
         branch = self.version_to_branch_mapping(version)
         for component, path in self.component_branch_version[branch].iteritems():
             component_template_path = os.path.join(self.templates_path, branch + "_" + component + ".json")

@@ -1,5 +1,8 @@
+import os
 import re
 import ast
+import json
+import errno
 import string
 from datetime import datetime, timedelta
 
@@ -14,6 +17,21 @@ def tryeval(val):
         pass
     return val
 
+
+def load_json(path):
+    with open(path, "r") as f:
+        rv = json.load(f)
+    return rv
+
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
 
 def get_timestamp_regex(get_utc=False):
     re1 = '((?:2|1)\\d{3}(?:-|\\/)(?:(?:0[1-9])|(?:1[0-2]))(?:-|\\/)(?:(?:0[1-9])|(?:[1-2][0-9])|(?:3[0-1]))' \

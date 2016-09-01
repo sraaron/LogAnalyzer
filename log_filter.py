@@ -3,6 +3,7 @@ import re
 import sys
 import util
 import json
+import shutil
 import string
 import zipfile
 import logging
@@ -15,43 +16,72 @@ logger = logging.getLogger(__name__)
 class Filter(object):
     """Filter will filter log information"""
 
-    def __init__(self, arg):
+    def __init__(self, arg, filter_type="techdump"):
         super(Filter, self).__init__()
         logger.info("Initialize Filter")
-        # self.arg = arg
-        self.filename = arg["filename"]
+        self.filter_type = filter_type
         self.channel_number = arg["channel_number"]
         self.timestamp_filter_rv = False
         self.cur_path = os.path.dirname(__file__)
-        self.techdump_file_path = os.path.join(self.cur_path, "techdumps", self.filename)
-        self.filter_settings_file_path = os.path.join(self.cur_path, "settings", "filter_settings.json")
-        self.filter_settings = self.convert_filter_settings(self.filter_settings_file_path,
-                                                            self.techdump_file_path, self.channel_number)
-        # print self.filename
+        if self.filter_type == "techdump":
+            self.techdump_name = arg["filename"]
+            self.filter_settings_file_path = os.path.join(self.cur_path, "settings", "filter_settings.json")
+            self.techdump_path = os.path.join(self.cur_path, "techdumps", self.techdump_name)
+        elif self.filter_type == "txt_result":
+            self.src_txt_result_dir_path = arg["src_txt_result_dir_path"]
+            self.techdump_name = arg["techdump_name"]
+            self.output_dir_path = os.path.join(self.cur_path, "techdumps", arg["test_result_dir"])
+            self.filter_settings_file_path = os.path.join(self.cur_path, "settings", "txt_filter_settings.json")
+            self.techdump_path = os.path.join(self.output_dir_path, self.techdump_name)
+        self.rel_path_filter_settings = self.convert_filter_settings(self.filter_settings_file_path,
+                                                                     "", self.channel_number)
+        self.abs_path_filter_settings = self.convert_filter_settings(self.filter_settings_file_path,
+                                                                     self.techdump_path, self.channel_number)
+        # print self.techdump_name
         # print self.channel_number
 
-    def convert_filter_settings(self, filter_settings_file_path, techdump_file_path, channel_number):
+    def convert_filter_settings(self, filter_settings_file_path, techdump_path, channel_number):
         rv = {}
         with open(filter_settings_file_path) as data_file:
             filter_json = json.load(data_file)
-            techdump_file_path = os.path.splitext(techdump_file_path)[0]
+            if os.path.isfile(techdump_path):
+                techdump_path = os.path.splitext(techdump_path)[0]
             rv = filter_json
             for key in filter_json:
-                rv[key]["path"] = os.path.normpath(os.path.join(techdump_file_path,
+                rv[key]["path"] = os.path.normpath(os.path.join(techdump_path,
                                                                 string.replace(filter_json[key]["path"], "#",
                                                                                channel_number)))
         return rv
 
     def get_filter_settings(self):
-        return self.filter_settings
+        return self.abs_path_filter_settings
 
     def filter_logs(self):
-        if self.channel_number > 0 and self.filename != "":
+        if self.channel_number > 0 and self.techdump_path != "":
             # need to first extract selected files and then filter
             # since recursive file traversal path might not always take the same route
             # and we need the channel pid from oplan for filtering log
-            self.extract_files()
+            if self.filter_type == "techdump" and os.path.isfile(self.techdump_path) and \
+                            ".zip" == os.path.splitext(self.techdump_path)[1]:
+                self.extract_files()
+            elif self.filter_type == "txt_result":
+                self.copy_files()
             self.log_filtering()
+
+    def copy_files(self):
+        for file_name, filter_setting in self.rel_path_filter_settings.iteritems():
+            if "..\\" in filter_setting["path"]:
+                filter_path = filter_setting["path"].replace("..\\", "")
+                src_file_path = os.path.join(os.path.dirname(self.src_txt_result_dir_path), filter_path)
+                dst_file_path = os.path.join(self.output_dir_path, filter_path)
+            else:
+                src_file_path = os.path.join(self.src_txt_result_dir_path, filter_setting["path"])
+                dst_file_path = os.path.join(self.techdump_path, filter_setting["path"])
+            util.mkdir_p(os.path.dirname(dst_file_path))
+            try:
+                shutil.copy2(src_file_path, dst_file_path)
+            except IOError as e:
+                logger.exception("src file path %s, dst file path %s" % (src_file_path, dst_file_path))
 
     '''
     Implementation of a recursive zip file reader and extracter.
@@ -69,8 +99,8 @@ class Filter(object):
                         self.read_zip_file(z2_filedata, extract_dir_path)
                 else:
                     whole_file_path = os.path.normpath(os.path.join(extract_dir, file_path))
-                    for key in self.filter_settings:
-                        if whole_file_path == self.filter_settings[key]["path"]:
+                    for key in self.abs_path_filter_settings:
+                        if whole_file_path == self.abs_path_filter_settings[key]["path"]:
                             z.extract(file_path, extract_dir)
 
 
@@ -132,28 +162,28 @@ class Filter(object):
         return self.generic_filter(file_path, self.timestamp_filter, False, start_time, stop_time)
 
     def extract_files(self):
-        extract_dir = os.path.dirname(self.techdump_file_path)
-        self.read_zip_file(self.techdump_file_path, extract_dir)
+        extract_dir = os.path.dirname(self.techdump_path)
+        self.read_zip_file(self.techdump_path, extract_dir)
 
     def log_filtering(self):
         # get channel pid
-        channel_pid = self.get_pid(self.filter_settings["oplan"]["path"])
+        channel_pid = self.get_pid(self.abs_path_filter_settings["oplan"]["path"])
 
         if channel_pid > 0:
             # get start/stop time of channel run (from transcoder.log)
-            start_time, stop_time = self.filter_by_pid(self.filter_settings["transcoder.log"]["path"], channel_pid, True)
+            start_time, stop_time = self.filter_by_pid(self.abs_path_filter_settings["transcoder.log"]["path"], channel_pid, True)
             # set 5 minutes offset for start, stop time
             start_time -= timedelta(minutes=5)
             stop_time += timedelta(minutes=5)
-            for key in self.filter_settings:
+            for key in self.abs_path_filter_settings:
                     if key == "transcoder.log":
                         continue
                     # filter logs by channel pid
-                    if "pid" == self.filter_settings[key]["filter_mode"]:
-                        self.filter_by_pid(self.filter_settings[key]["path"], channel_pid)
+                    if "pid" == self.abs_path_filter_settings[key]["filter_mode"]:
+                        self.filter_by_pid(self.abs_path_filter_settings[key]["path"], channel_pid)
                     # extract logs within start/stop this time
-                    elif "time" == self.filter_settings[key]["filter_mode"]:
-                        self.filter_by_timestamp(self.filter_settings[key]["path"], start_time, stop_time)
+                    elif "time" == self.abs_path_filter_settings[key]["filter_mode"]:
+                        self.filter_by_timestamp(self.abs_path_filter_settings[key]["path"], start_time, stop_time)
 
 if __name__ == "__main__":
     Filter(sys.argv[1:])

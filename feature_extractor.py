@@ -13,13 +13,16 @@ class FeatureExtractor(object):
     def __init__(self, component_template, techdump_filename, filter_settings):
         logger.info("Initialize Feature Extractor")
         self.component_template = component_template
-        self.techdump_folder_name = os.path.splitext(techdump_filename)[0]
+        if os.path.isfile(techdump_filename):
+            self.techdump_folder_name = os.path.splitext(techdump_filename)[0]
+        else:
+            self.techdump_folder_name = techdump_filename
         self.filter_settings = filter_settings
         self.cur_path = os.path.dirname(__file__)
         self.techdump_folder_path = os.path.join(self.cur_path, "techdumps", self.techdump_folder_name)
         self.output_folder = os.path.join(self.cur_path, "outputs", self.techdump_folder_name)
         if not os.path.isdir(self.output_folder):
-            os.mkdir(self.output_folder)
+            util.mkdir_p(self.output_folder)
 
     def extract_transcode_pack_features(self, log_file_path, template):
         transcoder_parser = TranscoderLogParser(debug_msg_template=template)

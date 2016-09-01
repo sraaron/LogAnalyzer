@@ -17,6 +17,7 @@ from os import curdir, sep
 from log_filter import Filter
 from templatizer import Templatizer
 from feature_extractor import FeatureExtractor
+from txt_result_importer import TxtResultImporter
 from BaseHTTPServer import HTTPServer
 from SocketServer import ThreadingMixIn
 from SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -113,6 +114,15 @@ def train(command):
     training_label = params['training_label']
     feature_set, ml_input_data_set = preprocessing(params)
     training(training_label, feature_set, ml_input_data_set)
+
+
+def train_with_txt(command):
+    params = json.loads(command)
+    # filter_logs = Filter(params, filter_type="txt_results")
+    txt_result_importer = TxtResultImporter(params)
+    txt_result_importer.extract_results()
+    print command
+    return
 
 
 def training(training_label, feature_set, ml_input_data_set):
@@ -285,6 +295,8 @@ class simpleHttpServerHander(SimpleHTTPRequestHandler):
             analyze(command)
         elif oper == "train":
             train(command)
+        elif oper == "train_with_txt":
+            train_with_txt(command)
         return 'okay'
 
     # override SimpleHTTPRequestHandler

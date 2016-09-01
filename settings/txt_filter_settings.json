@@ -1,0 +1,64 @@
+{
+	"overall_result.json":
+	{
+		"path": "..\\results.json",
+		"filter_mode": "none"
+	},
+	"overall_info.json":
+	{
+		"path": "..\\test_info.json",
+		"filter_mode": "none"
+	},
+	"test_case_result.json":
+	{
+		"path": "result.json",
+		"filter_mode": "none"
+	},
+	"test_case_info.json":
+	{
+		"path": "test_case_info.json",
+		"filter_mode": "none"
+	},
+	"oplan": 
+	{
+		"path": "logs\\Channel_#_oplan.opl",
+		"filter_mode": "channel_number"
+	},
+	"channel_xml": 
+	{ 
+		"path": "txprofile.xml",
+		"filter_mode": "channel_number"
+	},
+	"transport_xml": 
+	{ 
+		"path": "txprofile.transport.xml",
+		"filter_mode": "none"
+	},
+	"controller.log": 
+	{ 
+		"path": "logs\\controller.log",
+		"filter_mode": "time",
+		"component": "Controller"
+	},
+	"dot_file": 
+	{ 
+		"path": "logs\\Channel_#_graph.dot",
+		"filter_mode": "channel_number"
+	},
+	"transcoder.log": 
+	{ 
+		"path": "logs\\transcoder_logs.log",
+		"filter_mode": "pid",
+		"component": "RmpSpTranscodePack"
+	},
+	"cellinfo_logs.log": 
+	{ 
+		"path": "logs\\cellinfo_logs.log",
+		"filter_mode": "pid"
+	},
+	"channel.log": 
+	{ 
+		"path": "logs\\Channel.log",
+		"filter_mode": "time"
+	}
+}
