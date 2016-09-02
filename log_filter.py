@@ -79,7 +79,10 @@ class Filter(object):
                 dst_file_path = os.path.join(self.techdump_path, filter_setting["path"])
             util.mkdir_p(os.path.dirname(dst_file_path))
             try:
-                shutil.copy2(src_file_path, dst_file_path)
+                if not os.path.exists(dst_file_path):
+                    shutil.copy2(src_file_path, dst_file_path)
+                else:
+                    logger.info("Didn't copy file %s as path %s already exists" % (src_file_path, dst_file_path))
             except IOError as e:
                 logger.exception("src file path %s, dst file path %s" % (src_file_path, dst_file_path))
 

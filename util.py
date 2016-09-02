@@ -9,6 +9,26 @@ from datetime import datetime, timedelta
 _alphanum = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
+_timeunitdeltas = [3600, 60, 1]
+
+def timedelta_to_int(str_timedelta):
+    int_timedelta = 0
+    str_timedelta = str_timedelta.split(".")[0]  # discard below second accuracy as too much variation
+    str_timedelta = str_timedelta.split(":")
+    for unit, time_unit_val in enumerate(str_timedelta):
+        int_timedelta += int(time_unit_val) * _timeunitdeltas[unit]
+    return int_timedelta
+
+
+
+def variable_eval(val):
+    # if string return exists
+    if isinstance(val, basestring):
+        return 1
+    # else return value
+    else:
+        return val
+
 
 def tryeval(val):
     try:

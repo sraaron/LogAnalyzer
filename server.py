@@ -14,6 +14,7 @@ import threading
 import posixpath
 import subprocess
 from os import curdir, sep
+from ml_engine import MLEngine
 from log_filter import Filter
 from templatizer import Templatizer
 from feature_extractor import FeatureExtractor
@@ -109,6 +110,13 @@ def analyze(command):
     preprocessing(params)
 
 
+def analyze_txt_result(command):
+    params = json.loads(command)
+    txt_result_importer = TxtResultImporter(params, mode="test")
+    txt_result_importer.extract_results()
+    print "DONE Analysis!"
+
+
 def train(command):
     params = json.loads(command)
     training_label = params['training_label']
@@ -118,11 +126,10 @@ def train(command):
 
 def train_with_txt(command):
     params = json.loads(command)
-    # filter_logs = Filter(params, filter_type="txt_results")
-    txt_result_importer = TxtResultImporter(params)
-    txt_result_importer.extract_results()
-    print command
-    return
+    txt_result_importer = TxtResultImporter(params, mode="train")
+    feature_set, data_set, ground_truth = txt_result_importer.extract_results()
+    learning_engine = MLEngine(feature_set=feature_set, data_set=data_set, ground_truth=ground_truth)
+    print "DONE Training!"
 
 
 def training(training_label, feature_set, ml_input_data_set):
@@ -297,6 +304,8 @@ class simpleHttpServerHander(SimpleHTTPRequestHandler):
             train(command)
         elif oper == "train_with_txt":
             train_with_txt(command)
+        elif oper == "analyze_txt_result":
+            analyze_txt_result(command)
         return 'okay'
 
     # override SimpleHTTPRequestHandler

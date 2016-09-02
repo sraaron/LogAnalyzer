@@ -109,8 +109,11 @@
 					<span>Refresh</span> <span class="glyphicon glyphicon-refresh"></span>
 				</button>		
 					<input id="toggle_test_train" type="checkbox" checked data-toggle="toggle" data-on="TEST" data-off="TRAIN"  data-onstyle="primary" data-offstyle="info" class="checkbox">
-				<button id="analyze" class="btn btn-default">
+				<!--button id="analyze" class="btn btn-default">
 					<span>Analyze</span> <span class="glyphicon glyphicon-play-circle"></span>
+				</button!-->
+				<button id="analyze_txt_result_btn" class="btn btn-default">
+					<span>Analyze TXT Result</span> <span class="glyphicon glyphicon-play-circle"></span>
 				</button>
 				<div id="upload_techdump_progress" class="progress"><div class="progress-bar"></div></div>
             </div>
@@ -131,9 +134,9 @@
 					</div>
 				</form>
 				<input id="toggle_good_bad" type="checkbox" checked data-toggle="toggle" data-on="GOOD" data-off="BAD" data-onstyle="success" data-offstyle="danger" class="checkbox">
-				<button id="train" class="btn btn-default">
+				<!--button id="train" class="btn btn-default">
 					<span>Train</span> <span class="glyphicon glyphicon-road"></span>
-				</button>
+				</button!-->
 				<button id="train_with_txt_btn" class="btn btn-default">
 					<span>Train using TXT Result</span> <span class="glyphicon glyphicon-road"></span>
 				</button>
@@ -223,6 +226,36 @@ Frontend
         </div>
       </div>
     </div><!--train_with_txt_dialog-->	
+	
+    <div id="analyze_txt_result_dialog" class="modal fade" role="dialog">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            <h4 class="modal-title">Analyze TXT Result</h4>
+          </div>
+          <div class="modal-body">
+            <form>
+              <div class="form-group">
+                <label>Start TXT Result Directory Path</label>
+                <input type="text" class="form-control" name="start_txt_path">
+              </div>              
+			  <div class="form-group">
+                <label>End TXT Result Directory Path</label>
+                <input type="text" class="form-control" name="end_txt_path">
+              </div>
+			  <div class="form-group">
+                <label>Channel Number</label>
+                <input type="text" class="form-control" name="channel_number_dialog">
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary action">Analyze TXT Result</button>
+          </div>
+        </div>
+      </div>
+    </div><!--analyze_txt_result_dialog-->		
 
     <script src="js/jquery.min.js"></script>
     <script src="js/bootstrap.min.js"></script>
@@ -319,7 +352,19 @@ Frontend
                         }, notify);
                     return true;
                 }
-            }            
+            },
+			'analyze_txt_result_dialog':
+            {
+                action: function (start_txt_path, end_txt_path, channel_number)
+                {
+						operation('analyze_txt_result', {
+                            start_txt_path: start_txt_path,
+                            end_txt_path: end_txt_path,
+							channel_number: channel_number
+                        }, notify);
+                    return true;
+                }
+            }             
         }
     });
     setup_functions();	
@@ -342,7 +387,18 @@ Frontend
 		
 		$('#train_with_txt_btn').click(function()
         {
-            $('#train_with_txt_dialog').modal();
+            notify({
+                    message: 'train with txt'
+                });
+			$('#train_with_txt_dialog').modal();
+        });
+		
+		$('#analyze_txt_result_btn').click(function()
+        {
+            notify({
+                     message: 'analyze with txt'
+                });
+			$('#analyze_txt_result_dialog').modal();
         });
 		
 		$('#upload_techdump').on('change', function(event)

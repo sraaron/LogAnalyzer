@@ -28,10 +28,12 @@ class FeatureExtractor(object):
         transcoder_parser = TranscoderLogParser(debug_msg_template=template)
         return transcoder_parser.parse_file(log_file_path=log_file_path, parse_debug_msg=True)
 
+    def get_analysis(self, output_file_path):
+        with open(os.path.join(self.output_folder, output_file_path), "r") as f:
+            return json.load(f)
 
-    def dump_analysis(self, analysis, log_filename):
-        log_filename += ".analysis.json"
-        with open(os.path.join(self.output_folder, log_filename), "w") as f:
+    def dump_analysis(self, analysis, output_file_path):
+        with open(os.path.join(self.output_folder, output_file_path), "w") as f:
             json.dump(analysis, f, indent=2)
 
     def extract_features(self):
@@ -39,14 +41,18 @@ class FeatureExtractor(object):
         for log_file, log_file_settings in self.filter_settings.iteritems():
             if "component" in log_file_settings:
                 log_file_path = os.path.join(self.techdump_folder_path, log_file_settings["path"])
+                output_file_path = os.path.join(self.output_folder,
+                                                os.path.splitext(os.path.basename(log_file_path))[0]) + ".analysis.json"
                 component = log_file_settings["component"]
                 if component in self.component_template:
                     template = self.component_template[component]
                     if component == "RmpSpTranscodePack":
-                        output_analysis[component] = self.extract_transcode_pack_features(log_file_path=log_file_path,
-                                                                                          template=template)
+                        if os.path.isfile(output_file_path):
+                            output_analysis[component] = self.get_analysis(output_file_path)
+                        else:
+                            output_analysis[component] = self.extract_transcode_pack_features(log_file_path=log_file_path,
+                                                                                              template=template)
 
-                        self.dump_analysis(analysis=output_analysis[component],
-                                           log_filename=os.path.splitext(os.path.basename(log_file_path))[0])
-
+                            self.dump_analysis(analysis=output_analysis[component],
+                                               output_file_path=output_file_path)
         return output_analysis

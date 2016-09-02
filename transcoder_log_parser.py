@@ -8,6 +8,7 @@ class TranscoderLogParser(object):
     """Parse Transcoder Log"""
 
     def __init__(self, debug_msg_template=None):
+        logger.info("Initialize TranscoderLog Parser")
         self.debug_msg_template = debug_msg_template
         self.first_timestamp = None
 
