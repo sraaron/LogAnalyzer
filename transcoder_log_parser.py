@@ -66,7 +66,7 @@ class TranscoderLogParser(object):
                                                          "line_number": int(sbraces[2]), "debug_msg": debug_msg}})
                         if parse_debug_msg:
                             rv[cpp_name][len(rv[cpp_name]) - 1][timedelta]["only_debug_string"], \
-                            rv[cpp_name][len(rv[cpp_name]) - 1][timedelta]["variables"] = \
+                            rv[cpp_name][len(rv[cpp_name]) - 1][timedelta]["debug_variables"] = \
                                 self.parse_debug_msg(cpp_name, debug_msg)
                     except Exception as e:
                         logger.exception(cpp_name + txt)

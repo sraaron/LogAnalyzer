@@ -126,6 +126,7 @@ class Filter(object):
     def generic_filter(self, file_path, filter_func, get_start_stop_time=False, *filter_func_args):
         start_time = 0
         stop_time = 0
+        line_count = 0
         with open(file_path, "r+") as f:
             # To DO: need to read line by line as log files might be huge, and loading into memory may cause
             # all the memory to be used up
@@ -139,8 +140,9 @@ class Filter(object):
                     else:
                         stop_time = util.get_timestamp(line)
                     f.write(line)
+                    line_count += 1
             f.truncate()
-        return start_time, stop_time
+        return start_time, stop_time, line_count
 
     def pid_filter(self, line, pid):
         return pid in line
@@ -174,7 +176,8 @@ class Filter(object):
 
         if channel_pid > 0:
             # get start/stop time of channel run (from transcoder.log)
-            start_time, stop_time = self.filter_by_pid(self.abs_path_filter_settings["transcoder.log"]["path"], channel_pid, True)
+            start_time, stop_time, line_count = self.filter_by_pid(self.abs_path_filter_settings["transcoder.log"]["path"], channel_pid, True)
+            util.update_min_line_count(line_count)
             # set 5 minutes offset for start, stop time
             start_time -= timedelta(minutes=5)
             stop_time += timedelta(minutes=5)

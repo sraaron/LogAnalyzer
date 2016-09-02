@@ -4,7 +4,6 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 missing_value = 'NaN'
-max_time_value = 10
 
 class MLEngine(object):
     """Train ML Engine"""
@@ -22,30 +21,28 @@ class MLEngine(object):
         rv_data = []
         # if not a single instance of cpp in data
         if time_cpp_data is None:
-            for i in range(0, max_time_value):
-                rv_data.append(i)  # normalized timedelta
-                rv_data.append(missing_value)  # cpp feature doesn't exist in cpp data
-                for debug_msgs_feature in cpp_feature:
-                    rv_data.append(missing_value)  # debug msg doesn't exist in cpp data
-                    if "debug_variables" in debug_msgs_feature and debug_msgs_feature["debug_variables"] != []:
-                        #  variables don't exist in cpp data
-                        rv_data.extend([missing_value] * len(debug_msgs_feature["debug_variables"]))
+            rv_data.append(missing_value)  # cpp feature doesn't exist in cpp data
+            for debug_msgs_feature in cpp_feature:
+                rv_data.append(missing_value)  # debug msg doesn't exist in cpp data
+                if "debug_variables" in debug_msgs_feature and debug_msgs_feature["debug_variables"] != []:
+                    #  variables don't exist in cpp data
+                    rv_data.extend([missing_value] * len(debug_msgs_feature["debug_variables"]))
         else:
-            rv_data.append(1)  # cp feature exists in cpp data
+            rv_data.append(1)  # cpp feature exists in cpp data
             for tuple_time_cpp_data in time_cpp_data:
                 for timedelta, cpp_data in tuple_time_cpp_data.iteritems():
                     # skip timedelta feature for now
-                    # rv_data.append(util.timedelta_to_int(timedelta))  # add timedelta as feature
+                    rv_data.append(util.str_timedelta_to_float(timedelta))  # add timedelta as feature
                     for debug_msgs_feature in cpp_feature:
                         if debug_msgs_feature["only_debug_string"] == cpp_data["only_debug_string"]:
                             rv_data.append(1)  # debug msg exists in cpp data
                             if "debug_variables" in debug_msgs_feature:
                                 variables_added = 0
                                 for variable in debug_msgs_feature["debug_variables"]:
-                                    if variable in cpp_data["variables"]:
+                                    if variable in cpp_data["debug_variables"]:
                                         variables_added -= 1
                                         try:
-                                            rv_data.append(util.variable_eval(cpp_data["variables"][variable]))
+                                            rv_data.append(util.variable_eval(cpp_data["debug_variables"][variable]))
                                         except Exception as e:
                                             rv_data.append(missing_value)
                                             logger.exception(variable)

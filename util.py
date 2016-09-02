@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import ast
 import json
 import errno
@@ -11,14 +12,28 @@ _alphanum = frozenset(
 
 _timeunitdeltas = [3600, 60, 1]
 
-def timedelta_to_int(str_timedelta):
-    int_timedelta = 0
-    str_timedelta = str_timedelta.split(".")[0]  # discard below second accuracy as too much variation
-    str_timedelta = str_timedelta.split(":")
-    for unit, time_unit_val in enumerate(str_timedelta):
-        int_timedelta += int(time_unit_val) * _timeunitdeltas[unit]
-    return int_timedelta
+_min_line_count = sys.maxsize
 
+
+def get_min_line_count():
+    return _min_line_count
+
+
+def update_min_line_count(val):
+    global _min_line_count
+    if val < _min_line_count:
+        _min_line_count = val
+
+
+def timedelta_to_float(timedelta_timedelta):
+    return timedelta_timedelta.total_seconds()
+
+
+def str_timedelta_to_float(str_timedelta):
+    float_timedelta = datetime.strptime(str_timedelta, "%H:%M:%S.%f")
+    float_timedelta = timedelta(seconds=float_timedelta.second, microseconds=float_timedelta.microsecond,
+                                minutes=float_timedelta.minute, hours=float_timedelta.hour)
+    return float_timedelta.total_seconds()
 
 
 def variable_eval(val):
