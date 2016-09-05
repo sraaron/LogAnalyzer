@@ -113,8 +113,10 @@ def analyze(command):
 def analyze_txt_result(command):
     params = json.loads(command)
     txt_result_importer = TxtResultImporter(params, mode="test")
-    txt_result_importer.extract_results()
-    print "DONE Analysis!"
+    debug_msg_set, feature_set, data_set, ground_truth = txt_result_importer.extract_results()
+    learning_engine = MLEngine(start_path=params["start_txt_path"], end_path=params["end_txt_path"], debug_msg_set=debug_msg_set, feature_set=feature_set, data_set=data_set, ground_truth=ground_truth)
+    prediction, report, c_matrix = learning_engine.predict()
+    print "DONE Prediction!"
 
 
 def train(command):
@@ -127,8 +129,9 @@ def train(command):
 def train_with_txt(command):
     params = json.loads(command)
     txt_result_importer = TxtResultImporter(params, mode="train")
-    feature_set, data_set, ground_truth = txt_result_importer.extract_results()
-    learning_engine = MLEngine(feature_set=feature_set, data_set=data_set, ground_truth=ground_truth)
+    debug_msg_set, feature_set, data_set, ground_truth = txt_result_importer.extract_results()
+    learning_engine = MLEngine(debug_msg_set=debug_msg_set, feature_set=feature_set, data_set=data_set, ground_truth=ground_truth)
+    learning_engine.train()
     print "DONE Training!"
 
 

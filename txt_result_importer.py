@@ -39,6 +39,7 @@ class TxtResultImporter(object):
         overall_extracted_log_features = []
         overall_test_case_labels = []
         component_template = {}
+        features_template = {}
         base_path = os.path.basename(self.start_path).split("-")
         if len(base_path) == 2:
             start_index = int(base_path[1])
@@ -60,7 +61,7 @@ class TxtResultImporter(object):
                         filter_settings = log_filter.get_filter_settings()
                         log_filter.filter_logs()
                         templatizer = Templatizer(acp_version=acp_version)
-                        component_template = templatizer.gen_template()
+                        component_template, features_template = templatizer.gen_template()
                         # extract features from log, using template
                         extractor = FeatureExtractor(component_template=component_template,
                                                      techdump_filename=techdump_rel_path,
@@ -70,7 +71,7 @@ class TxtResultImporter(object):
 
         else:
             logger.error("Invalid start path provided. Needs to contain '-' in last directory %s" % self.start_path)
-        return component_template, overall_extracted_log_features, overall_test_case_labels
+        return component_template, features_template, overall_extracted_log_features, overall_test_case_labels
 
 
 

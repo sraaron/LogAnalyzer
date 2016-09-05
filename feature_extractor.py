@@ -26,7 +26,7 @@ class FeatureExtractor(object):
 
     def extract_transcode_pack_features(self, log_file_path, template):
         transcoder_parser = TranscoderLogParser(debug_msg_template=template)
-        return transcoder_parser.parse_file(log_file_path=log_file_path, parse_debug_msg=True)
+        return transcoder_parser.parse_file(log_file_path=log_file_path)
 
     def get_analysis(self, output_file_path):
         with open(os.path.join(self.output_folder, output_file_path), "r") as f:

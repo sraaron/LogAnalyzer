@@ -5,6 +5,7 @@ import ast
 import json
 import errno
 import string
+import hashlib
 from datetime import datetime, timedelta
 
 _alphanum = frozenset(
@@ -13,7 +14,6 @@ _alphanum = frozenset(
 _timeunitdeltas = [3600, 60, 1]
 
 _min_line_count = sys.maxsize
-
 
 def get_min_line_count():
     return _min_line_count
@@ -30,7 +30,10 @@ def timedelta_to_float(timedelta_timedelta):
 
 
 def str_timedelta_to_float(str_timedelta):
-    float_timedelta = datetime.strptime(str_timedelta, "%H:%M:%S.%f")
+    if "." in str_timedelta:
+        float_timedelta = datetime.strptime(str_timedelta, "%H:%M:%S.%f")
+    else:
+        float_timedelta = datetime.strptime(str_timedelta, "%H:%M:%S")
     float_timedelta = timedelta(seconds=float_timedelta.second, microseconds=float_timedelta.microsecond,
                                 minutes=float_timedelta.minute, hours=float_timedelta.hour)
     return float_timedelta.total_seconds()
@@ -136,3 +139,15 @@ def escape(pattern):
             else:
                 s[i] = "\\" + c
     return pattern[:0].join(s)
+
+
+class Hasher(object):
+    def __init__(self):
+        self.hash_fnc = hashlib.md5()
+
+    def update(self, string_msg):
+        self.hash_fnc.update(string_msg)
+
+    def digest(self):
+        return self.hash_fnc.hexdigest()
+

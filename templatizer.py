@@ -26,6 +26,7 @@ class Templatizer(object):
                                                                "component_branch_version.json")
         self.component_branch_version = {}
         self.component_template = {}
+        self.features = {}
         self.int_types = []
         with open(self.component_branch_version_file_path, "r") as f:
             self.component_branch_version = json.load(f)
@@ -140,6 +141,7 @@ class Templatizer(object):
         debug_string_regex = ""
         only_debug_string = ""
         debug_variables = []
+        hash_string = ""
         try:
             debug_msg_arg = self.int_types_to_ctypes(debug_msg_arg)
             data = re.compile(r'''((?:[^,"']|"[^"]*"|'[^']*')+)''').split(debug_msg_arg)[1::2]
@@ -148,6 +150,10 @@ class Templatizer(object):
             debug_variables = [x.strip() for x in data[3:]]
             debug_level_value = self.debug_level_to_val(debug_level_string)
             only_debug_string, debug_string_regex, valid = self.debug_string_to_regex(debug_string)
+            hasher = util.Hasher()
+            hasher.update(only_debug_string)
+            [hasher.update(x) for x in debug_variables]
+            hash_string = hasher.digest()
             if valid is False:
                 return None
         except Exception as e:
@@ -156,7 +162,7 @@ class Templatizer(object):
         return {"only_debug_string": only_debug_string, "debug_area": debug_area,
                 "debug_level_string": debug_level_string, "debug_level_value": debug_level_value,
                 "debug_string": debug_string, "debug_variables": debug_variables,
-                "debug_string_regex": debug_string_regex}
+                "debug_string_regex": debug_string_regex, "hash": hash_string}
 
     def extract_transcode_pack_template(self, svn_path, component_template_path):
         if "RmpSpTranscodePack" not in self.component_template:
@@ -189,6 +195,15 @@ class Templatizer(object):
         if debug_msg_count > 0:
             self.component_template["RmpSpTranscodePack"][cpp_file_name] = debug_msg_templates
 
+    def gen_features(self, templates):
+        features_template = ["log_line_number", "timedelta", "hash"]
+        if templates is not None:
+            for cpp_name, debug_msgs in templates.iteritems():
+                for template in debug_msgs:
+                    if template["debug_variables"]:
+                        features_template.extend([template["hash"] + "_" + x for x in template["debug_variables"]])
+        self.features["RmpSpTranscodePack"] = features_template
+
     def crawler(self, svn_path, component_template_path, component):
         svn_list = [s.strip() for s in subprocess.check_output(['svn', 'list', svn_path]).splitlines()]
         if component == "RmpSpTranscodePack" and len(self.int_types) == 0:
@@ -211,6 +226,7 @@ class Templatizer(object):
         branch = self.version_to_branch_mapping(version)
         for component, path in self.component_branch_version[branch].iteritems():
             component_template_path = os.path.join(self.templates_path, branch + "_" + component + ".json")
+            features_path = os.path.join(self.templates_path, branch + "_" + component + "_features.json")
             if not os.path.exists(component_template_path):
                 self.crawler(path, component_template_path, component)
                 with open(component_template_path, "w") as f:
@@ -218,7 +234,16 @@ class Templatizer(object):
             else:
                 with open(component_template_path, "r") as f:
                     self.component_template[component] = json.load(f)
-        return self.component_template
+
+            if not os.path.exists(features_path):
+                self.gen_features(self.component_template[component])
+                with open(features_path, "w") as f:
+                    json.dump(self.features[component], f, indent=2)
+            else:
+                with open(features_path, "r") as f:
+                    self.features[component] = json.load(f)
+
+        return self.component_template, self.features
 
     def version_to_branch_mapping(self, version):
         branch = ""
