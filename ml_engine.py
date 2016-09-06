@@ -11,7 +11,7 @@ from sklearn.metrics import classification_report
 from sklearn.preprocessing import Imputer
 
 logger = logging.getLogger(__name__)
-missing_value = 'NaN'
+missing_value = sys.maxint  # 'NaN'
 
 class MLEngine(object):
     """Train ML Engine"""
@@ -21,6 +21,7 @@ class MLEngine(object):
         logger.info("Initialize ML Engine")
         self.cur_path = os.path.dirname(__file__)
         self.trained_model_path = os.path.join(self.cur_path, "outputs", "trained_models", "model.pkl")
+        self.trained_model_info_path = os.path.join(self.cur_path, "outputs", "trained_models", "model_info.json")
         if start_path is not None and end_path is not None:
             output_name = os.path.basename(start_path) + "_" + os.path.basename(end_path) + ".json"
             self.prediction_path = os.path.join(self.cur_path, "outputs", "test", output_name)
@@ -29,38 +30,44 @@ class MLEngine(object):
         self.data_set = data_set
         self.ground_truth = ground_truth
         self.target = []
-        self.data, self.n_features, self.n_samples = self.format_data()
-        # Create a classifier: a support vector classifier
-        # use linear classifier as we have large dimensionality
-        self.classifier = svm.SVC(gamma='auto', kernel='linear', probability=False)
+        self.data = None
+        self.n_features = None
+        self.n_samples = None
+        self.classifier = svm.SVC(gamma='auto', kernel='poly', probability=False)
         self.predicted = []
 
     def train(self):
+        self.data, self.n_features, self.n_samples = self.format_data(mode="train")
         self.target = self.format_target()
         # train the classifier
         clf = self.classifier.fit(self.data, self.target)
         # evaluate training error
         # clf.score(self.data, self.target)
+        if os.path.isfile(self.trained_model_path):
+            os.remove(self.trained_model_path)
         joblib.dump(clf, self.trained_model_path, compress=9)
+        model_info = {"n_samples": self.n_samples, "n_features": self.n_features}
+        with open(self.trained_model_info_path, "w") as f:
+            json.dump(model_info, f, indent=2)
         print "TRAINED!"
 
     def predict(self):
+        self.data, self.n_features, self.n_samples = self.format_data(mode="predict")
         clf = joblib.load(self.trained_model_path)
         self.predicted = clf.predict(self.data)
         prediction = {}
-        report, c_matrix = None
-        for group_idx, test_group_data in enumerate(self.data_set):
-            for idx, test_name in enumerate(test_group_data):
-                actual = "NaN"
-                if self.ground_truth is not None:
-                    actual = self.ground_truth[group_idx][test_name]
-                prediction["test_name"] = {"prediction": self.predicted[idx], "actual": actual}
         if self.ground_truth is not None:
             self.target = self.format_target()
             prediction["report"] = classification_report(self.target, self.predicted)
-            prediction["confusion_matrix"] = confusion_matrix(self.target, self.predicted)
+            prediction["confusion_matrix"] = confusion_matrix(self.target, self.predicted).tolist()
+        for group_idx, test_group_data in enumerate(self.data_set):
+            for idx, test_name in enumerate(test_group_data):
+                actual = "NaN"
+                if self.target is not None:
+                    actual = self.target[idx]
+                prediction[test_name] = {"prediction": self.predicted[idx], "actual": actual}
         with open(self.prediction_path, "w") as f:
-            json.dump(f, prediction)
+            json.dump(prediction, f, indent=2)
         return prediction
 
     def add_data(self, dbg_msg_template, feature_template, log_msgs):
@@ -100,7 +107,7 @@ class MLEngine(object):
                         target.append(0)
         return target
 
-    def format_data(self):
+    def format_data(self, mode="train"):
         data = []
         n_features = sys.maxsize
         n_samples = 0
@@ -114,6 +121,18 @@ class MLEngine(object):
                         if len(data[len(data)-1]) < n_features:
                             n_features = len(data[len(data)-1])  # number of features for each data sample
                         n_samples += 1
+
+        # TO DO: idea: each line in log is also a sample ?
+        if mode == "predict":
+            with open(self.trained_model_info_path, "r") as f:
+                model_n_features = json.load(f)["n_features"]
+                '''
+                if model_n_features > n_features:
+                    raise Exception("Model consists of %d features, test sample consists of %d features. "
+                                    "Model needs to have more features than test sample")
+                '''
+                n_features = model_n_features
+
         format_data = None
         for data_item in data:
             if format_data is None:
@@ -122,11 +141,12 @@ class MLEngine(object):
                 format_data = np.hstack((format_data, np.array(data_item[:n_features])[np.newaxis]))
         format_data = format_data.reshape(n_samples, n_features)
 
-        # Create our imputer to replace missing values with the mean e.g.
-        imp = Imputer(missing_values='NaN', strategy='mean', axis=0)
+        # Create our imputer to replace missing values with most_frequent value e.g.
+        imp = Imputer(missing_values='NaN', strategy='most_frequent', axis=1)
         imp = imp.fit(format_data)
 
         # Impute our data, then train
         rv_format_data = imp.transform(format_data)
 
+        # rv_format_data = format_data
         return rv_format_data, n_features, n_samples
