@@ -28,6 +28,7 @@ class Templatizer(object):
         self.component_template = {}
         self.features = {}
         self.int_types = []
+        self.msg_id = 0
         with open(self.component_branch_version_file_path, "r") as f:
             self.component_branch_version = json.load(f)
 
@@ -156,13 +157,15 @@ class Templatizer(object):
             hash_string = hasher.digest()
             if valid is False:
                 return None
+            else:
+                self.msg_id += 1
         except Exception as e:
             print e
             logger.exception(debug_msg_arg)
         return {"only_debug_string": only_debug_string, "debug_area": debug_area,
                 "debug_level_string": debug_level_string, "debug_level_value": debug_level_value,
                 "debug_string": debug_string, "debug_variables": debug_variables,
-                "debug_string_regex": debug_string_regex, "hash": hash_string}
+                "debug_string_regex": debug_string_regex, "hash": hash_string, "msg_id": self.msg_id}
 
     def extract_transcode_pack_template(self, svn_path, component_template_path):
         if "RmpSpTranscodePack" not in self.component_template:
@@ -196,7 +199,7 @@ class Templatizer(object):
             self.component_template["RmpSpTranscodePack"][cpp_file_name] = debug_msg_templates
 
     def gen_features(self, templates):
-        features_template = ["log_line_number", "timedelta", "hash"]
+        features_template = ["log_line_number", "timedelta", "msg_id"]
         if templates is not None:
             for cpp_name, debug_msgs in templates.iteritems():
                 for template in debug_msgs:

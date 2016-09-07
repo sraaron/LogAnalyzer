@@ -33,7 +33,7 @@ class MLEngine(object):
         self.data = None
         self.n_features = None
         self.n_samples = None
-        self.classifier = svm.SVC(gamma='auto', kernel='poly', probability=False)
+        self.classifier = svm.SVC(gamma='auto', kernel='rbf', probability=False)
         self.predicted = []
 
     def train(self):
@@ -74,15 +74,8 @@ class MLEngine(object):
         rv_data = []
         for log_line in log_msgs:
             try:
-                # add feature variables
-                rv_data.append(log_line["log_line_number"])
-                rv_data.append(util.str_timedelta_to_float(log_line["timedelta"]))
-                # sparse data, should be unique and shouldn't affect locality
-                if "" != log_line["hash"]:
-                    rv_data.append(long(log_line["hash"], 16) % (2 ^ 63))
-                    # TO DO: need to perform dimensionality reduction (PCA?)
-                    for idx, feature in enumerate(feature_template):
-                        if idx > 2:
+                for idx, feature in enumerate(feature_template):
+                        if '_' in feature:
                             hash_variable = feature.split('_', 1)
                             if hash_variable[0] == log_line["hash"]:  # if hashes match
                                 rv_data.append(util.variable_eval(log_line["debug_variables"][hash_variable[1]]))
@@ -91,6 +84,11 @@ class MLEngine(object):
                                     rv_data.append(rv_data[len(rv_data) - len(feature_template)])  # use previous value, use as state
                                 else:
                                     rv_data.append(missing_value)
+                        else:
+                            if feature in log_line and "" != log_line[feature]:
+                                rv_data.append(log_line[feature])
+                            else:
+                                rv_data.append(missing_value)
             except Exception as e:
                 logger.exception(log_line)
         return rv_data

@@ -13,7 +13,7 @@ class TranscoderLogParser(object):
         self.first_timestamp = None
 
     def parse_debug_msg(self, cpp_name, debug_msg):
-        rv = "", {}, ""
+        rv = "", {}, "", ""
         debug_msg = debug_msg.rstrip("\n").rstrip("\\n")
         if self.debug_msg_template is not None and cpp_name in self.debug_msg_template:
             for debug_msg_template in self.debug_msg_template[cpp_name]:
@@ -33,7 +33,7 @@ class TranscoderLogParser(object):
                             rv_dict[variable_name] = util.tryeval(m.group(idx+1))
                         hash_digest = hasher.digest()
                         if hash_digest == debug_msg_template["hash"]:  # find unique match
-                            rv = debug_msg_template["only_debug_string"], rv_dict, hash_digest
+                            rv = debug_msg_template["only_debug_string"], rv_dict, hash_digest, debug_msg_template["msg_id"]
                             break  # break on match, expect only one unique match
                 except Exception as e:
                     logger.exception(debug_msg + regex_match)
@@ -56,7 +56,7 @@ class TranscoderLogParser(object):
                     if self.first_timestamp is None:
                         self.first_timestamp = timedelta
                     timedelta -= self.first_timestamp
-                    timedelta = str(timedelta)
+                    timedelta = util.timedelta_to_float(timedelta)
                     level = int(m.group(1)[1])
                     # remove start/ending square braces and split
                     sbraces = re.split('[@|:]', m.group(2)[1:len(m.group(2)) - 1])
@@ -70,7 +70,7 @@ class TranscoderLogParser(object):
                                    "level": level, "function_name": sbraces[0], "debug_msg": debug_msg,
                                    "log_line_number": log_line_number})
                         rv[len(rv) - 1]["only_debug_string"], rv[len(rv) - 1]["debug_variables"], \
-                        rv[len(rv) - 1]["hash"] = self.parse_debug_msg(cpp_name, debug_msg)
+                        rv[len(rv) - 1]["hash"], rv[len(rv) - 1]["msg_id"] = self.parse_debug_msg(cpp_name, debug_msg)
                         if rv[len(rv) - 1]["hash"] == "":
                             rv.pop()
                     except Exception as e:
