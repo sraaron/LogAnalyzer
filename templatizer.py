@@ -204,7 +204,7 @@ class Templatizer(object):
             for cpp_name, debug_msgs in templates.iteritems():
                 for template in debug_msgs:
                     if template["debug_variables"]:
-                        features_template.extend([template["hash"] + "_" + x for x in template["debug_variables"]])
+                        features_template.extend([template["hash"] + "-" + x for x in template["debug_variables"]])
         self.features["RmpSpTranscodePack"] = features_template
 
     def crawler(self, svn_path, component_template_path, component):

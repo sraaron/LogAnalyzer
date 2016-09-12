@@ -88,8 +88,8 @@ class MLEngine(object):
                 rv_features = []
                 debug_msg_match = False
                 for idx, feature in enumerate(feature_template):
-                        if '_' in feature:
-                            hash_variable = feature.split('_', 1)
+                        if '-' in feature:
+                            hash_variable = feature.split('-', 1)
                             if hash_variable[0] == log_line["hash"]:  # if hashes match
                                 debug_msg_match = True
                                 rv_features.append(util.variable_eval(log_line["debug_variables"][hash_variable[1]]))
@@ -133,7 +133,7 @@ class MLEngine(object):
         n_features = len(data[0])
         print n_samples
         print n_features
-        print data[0]
+        # print data[0]
         # TO DO: idea: each line in log is also a sample ?
         if mode == "predict":
             with open(self.trained_model_info_path, "r") as f:
@@ -147,13 +147,13 @@ class MLEngine(object):
 
         format_data = pd.lib.to_object_array(data).astype(float)
 
-        """
+
         # Create our imputer to replace missing values with most_frequent value e.g.
         imp = Imputer(missing_values='NaN', strategy='most_frequent', axis=0)
         imp = imp.fit(format_data)
 
         # Impute our data, then train
         rv_format_data = imp.transform(format_data)
-        """
+
         # rv_format_data = format_data
-        return format_data, n_features, n_samples
+        return rv_format_data, n_features, n_samples
