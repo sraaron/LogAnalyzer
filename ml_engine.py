@@ -1,22 +1,26 @@
 import os
-import sys
 import util
 import json
 import logging
-import numpy as np
 import pandas as pd
-from sklearn import svm, metrics
+from operator import itemgetter
+from collections import Counter
 from sklearn.externals import joblib
+from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
-from sklearn.preprocessing import Imputer
+from sklearn.feature_selection import SelectFromModel
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 logger = logging.getLogger(__name__)
-missing_value = 'NaN'  # sys.maxint  #
+missing_value = 0  # 'NaN'  # sys.maxint  #
+max_features = 5
 
 class MLEngine(object):
     """Train ML Engine"""
-    def __init__(self, msg_template_set, feature_set, data_set, ground_truth=None, start_path=None, end_path=None):
+    def __init__(self, acp_version, msg_template_set, feature_set, data_set, ground_truth=None, start_path=None, end_path=None):
         # TO DO need to have out of core learning if data set is very large
         # http://scikit-learn.org/stable/modules/scaling_strategies.html
         logger.info("Initialize ML Engine")
@@ -35,15 +39,52 @@ class MLEngine(object):
         self.data = None
         self.n_features = None
         self.n_samples = None
-        self.classifier = svm.SVC(gamma='auto', kernel='linear', probability=False)
+        self.classifier = RandomForestClassifier(n_estimators=25)
+
+        # RandomForestClassifier(n_estimators=25)
+        # svm.SVC(gamma=2, C=1, shrinking=False, verbose=2)
+        """
+        C=1.0, cache_size=200, class_weight=None, coef0=0.0,
+        decision_function_shape=None, degree=3, gamma='auto', kernel='rbf',
+        max_iter=-1, probability=False, random_state=None, shrinking=True,
+        tol=0.001, verbose=True
+        """
         self.predicted = []
+        branch = util.version_to_branch_mapping(acp_version[:acp_version.rfind('.')])
+        self.features_path = os.path.join(self.cur_path, "templates", branch + "_RmpSpTranscodePack_features.json")
+        self.features_selected_info_path = os.path.join(self.cur_path, "templates", branch +
+                                                        "_RmpSpTranscodePack_selected_features_info.json")
+        self.features_selected_path = os.path.join(self.cur_path, "templates",
+                                                        branch + "_RmpSpTranscodePack_selected_features.json")
 
     def train(self):
         self.data, self.n_features, self.n_samples = self.format_data(mode="train")
-        # train the classifier
-        clf = self.classifier.fit(self.data, self.target)
+        with open(self.features_path, "r") as f:
+            features_names = json.load(f)
+        # feature selection
+        # fit an Extra Trees model to the data
+        sel = ExtraTreesClassifier()
+        sel.fit(self.data, self.target)
+        features_selected = {}
+
+        # display the relative importance of each attribute
+        for idx, importance in enumerate(sel.feature_importances_):
+            features_selected[features_names[idx]] = importance
+        features_selected = dict(Counter(features_selected).most_common(max_features))
+        min_threshold = min(features_selected.iteritems(), key=itemgetter(1))[1]
+        with open(self.features_selected_info_path, "w") as f:
+            json.dump(features_selected, f, indent=2)
+        with open(self.features_selected_path, "w") as f:
+            json.dump(features_selected.keys(), f, indent=2)
+        selection_model = SelectFromModel(sel, prefit=True, threshold=min_threshold)
+        X_new = selection_model.transform(self.data)
+
+        clf = self.classifier.fit(X_new, self.target)
+        self.n_samples, self.n_features = X_new.shape
+
         # evaluate training error
         # clf.score(self.data, self.target)
+
         if os.path.isfile(self.trained_model_path):
             os.remove(self.trained_model_path)
         joblib.dump(clf, self.trained_model_path, compress=9)
@@ -54,6 +95,12 @@ class MLEngine(object):
 
     def predict(self):
         self.data, self.n_features, self.n_samples = self.format_data(mode="predict")
+        # feature selection
+        """
+        lsvc = LinearSVC(C=0.01, penalty="l1", dual=False).fit(self.data, self.target)
+        model = SelectFromModel(lsvc, prefit=True)
+        X_new = model.transform(self.data)
+        """
         clf = joblib.load(self.trained_model_path)
         self.predicted = clf.predict(self.data)
         prediction = {}
@@ -133,8 +180,7 @@ class MLEngine(object):
         n_features = len(data[0])
         print n_samples
         print n_features
-        # print data[0]
-        # TO DO: idea: each line in log is also a sample ?
+
         if mode == "predict":
             with open(self.trained_model_info_path, "r") as f:
                 model_n_features = json.load(f)["n_features"]
@@ -146,14 +192,13 @@ class MLEngine(object):
                 n_features = model_n_features
 
         format_data = pd.lib.to_object_array(data).astype(float)
-
-
-        # Create our imputer to replace missing values with most_frequent value e.g.
+        '''
+        # Create our imputer to replace missing values with most_frequent value
         imp = Imputer(missing_values='NaN', strategy='most_frequent', axis=0)
         imp = imp.fit(format_data)
 
         # Impute our data, then train
         rv_format_data = imp.transform(format_data)
-
-        # rv_format_data = format_data
+        '''
+        rv_format_data = format_data
         return rv_format_data, n_features, n_samples

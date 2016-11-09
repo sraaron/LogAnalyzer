@@ -3,6 +3,7 @@ import re
 import sys
 import ast
 import json
+import math
 import errno
 import string
 import hashlib
@@ -50,9 +51,14 @@ def variable_eval(val):
 
 def tryeval(val):
     try:
-        val = ast.literal_eval(val)
+        val = int(val, 16)
     except:
-        pass
+        try:
+            val = ast.literal_eval(val)
+            if math.isinf(val):
+                print "val is is infinit %d" % val
+        except:
+            pass
     return val
 
 
@@ -150,4 +156,20 @@ class Hasher(object):
 
     def digest(self):
         return self.hash_fnc.hexdigest()
+
+
+def version_to_branch_mapping(version):
+    branch = ""
+    version = version.lower()
+    if "eng" in version:
+        branch = "trunk"
+    else:
+        version_split = version.split(".")
+        version_split[len(version_split) - 2] = "x"
+        for idx, val in enumerate(version_split):
+            if idx == len(version_split) - 1:
+                branch += val
+            else:
+                branch += val + "."
+    return branch
 

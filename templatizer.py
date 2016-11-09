@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 class Templatizer(object):
     """Create log message template based on code repo"""
 
-    def __init__(self, filter_settings=None, acp_version=None):
+    def __init__(self, mode, filter_settings=None, acp_version=None):
         logger.info("Initialize Templatizer")
+        self.mode = mode
         self.filter_settings = filter_settings
         self.acp_version = acp_version
         self.cur_path = os.path.dirname(__file__)
@@ -226,10 +227,14 @@ class Templatizer(object):
             version, build_number = self.get_swversion()
         else:
             version = self.acp_version[:self.acp_version.rfind('.')]
-        branch = self.version_to_branch_mapping(version)
+        branch = util.version_to_branch_mapping(version)
         for component, path in self.component_branch_version[branch].iteritems():
             component_template_path = os.path.join(self.templates_path, branch + "_" + component + ".json")
-            features_path = os.path.join(self.templates_path, branch + "_" + component + "_features.json")
+            if self.mode == 'train':
+                features_path = os.path.join(self.templates_path, branch + "_" + component + "_features.json")
+            elif self.mode == 'test':
+                features_path = os.path.join(self.templates_path, branch + "_" + component + "_selected_features.json")
+            # features_path = os.path.join(self.templates_path, branch + "_" + component + "_features_working.json")
             if not os.path.exists(component_template_path):
                 self.crawler(path, component_template_path, component)
                 with open(component_template_path, "w") as f:
@@ -247,21 +252,6 @@ class Templatizer(object):
                     self.features[component] = json.load(f)
 
         return self.component_template, self.features
-
-    def version_to_branch_mapping(self, version):
-        branch = ""
-        version = version.lower()
-        if "eng" in version:
-            branch = "trunk"
-        else:
-            version_split = version.split(".")
-            version_split[len(version_split)-2] = "x"
-            for idx, val in enumerate(version_split):
-                if idx == len(version_split)-1:
-                    branch += val
-                else:
-                    branch += val + "."
-        return branch
 
     def get_swversion(self):
         rv = None
