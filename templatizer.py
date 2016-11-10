@@ -234,7 +234,7 @@ class Templatizer(object):
                 features_path = os.path.join(self.templates_path, branch + "_" + component + "_features.json")
             elif self.mode == 'test':
                 features_path = os.path.join(self.templates_path, branch + "_" + component + "_selected_features.json")
-            # features_path = os.path.join(self.templates_path, branch + "_" + component + "_features_working.json")
+            # features_path = os.path.join(self.templates_path, branch + "_" + component + "_features.json")
             if not os.path.exists(component_template_path):
                 self.crawler(path, component_template_path, component)
                 with open(component_template_path, "w") as f:

@@ -5,14 +5,14 @@ import logging
 import pandas as pd
 from operator import itemgetter
 from collections import Counter
+from sklearn import preprocessing
 from sklearn.externals import joblib
-from sklearn.decomposition import PCA
 from sklearn.metrics import confusion_matrix
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
 from sklearn.feature_selection import SelectFromModel
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+
 
 logger = logging.getLogger(__name__)
 missing_value = 0  # 'NaN'  # sys.maxint  #
@@ -25,6 +25,8 @@ class MLEngine(object):
         # http://scikit-learn.org/stable/modules/scaling_strategies.html
         logger.info("Initialize ML Engine")
         self.cur_path = os.path.dirname(__file__)
+        self.scaler_path = os.path.join(self.cur_path, "outputs", "trained_models", "scaler.pkl")
+        self.feature_selection_path = os.path.join(self.cur_path, "outputs", "trained_models", "feature.pkl")
         self.trained_model_path = os.path.join(self.cur_path, "outputs", "trained_models", "model.pkl")
         self.trained_model_info_path = os.path.join(self.cur_path, "outputs", "trained_models", "model_info.json")
         if start_path is not None and end_path is not None:
@@ -40,6 +42,7 @@ class MLEngine(object):
         self.n_features = None
         self.n_samples = None
         self.classifier = RandomForestClassifier(n_estimators=25)
+        self.min_threshold = 0
 
         # RandomForestClassifier(n_estimators=25)
         # svm.SVC(gamma=2, C=1, shrinking=False, verbose=2)
@@ -61,26 +64,37 @@ class MLEngine(object):
         self.data, self.n_features, self.n_samples = self.format_data(mode="train")
         with open(self.features_path, "r") as f:
             features_names = json.load(f)
+
         # feature selection
         # fit an Extra Trees model to the data
         sel = ExtraTreesClassifier()
         sel.fit(self.data, self.target)
-        features_selected = {}
+        if os.path.isfile(self.feature_selection_path):
+            os.remove(self.feature_selection_path)
+        joblib.dump(sel, self.feature_selection_path, compress=9)
 
+        features_selected = {}
         # display the relative importance of each attribute
         for idx, importance in enumerate(sel.feature_importances_):
             features_selected[features_names[idx]] = importance
         features_selected = dict(Counter(features_selected).most_common(max_features))
-        min_threshold = min(features_selected.iteritems(), key=itemgetter(1))[1]
+        self.min_threshold = min(features_selected.iteritems(), key=itemgetter(1))[1]
         with open(self.features_selected_info_path, "w") as f:
             json.dump(features_selected, f, indent=2)
         with open(self.features_selected_path, "w") as f:
             json.dump(features_selected.keys(), f, indent=2)
-        selection_model = SelectFromModel(sel, prefit=True, threshold=min_threshold)
+        selection_model = SelectFromModel(sel, prefit=True, threshold=self.min_threshold)
         X_new = selection_model.transform(self.data)
 
-        clf = self.classifier.fit(X_new, self.target)
-        self.n_samples, self.n_features = X_new.shape
+        scaler = preprocessing.StandardScaler().fit(X_new)
+        if os.path.isfile(self.scaler_path):
+            os.remove(self.scaler_path)
+        joblib.dump(scaler, self.scaler_path, compress=9)
+
+        X_scaled = scaler.transform(X_new)
+
+        clf = self.classifier.fit(X_scaled, self.target)
+        self.n_samples, self.n_features = X_scaled.shape
 
         # evaluate training error
         # clf.score(self.data, self.target)
@@ -101,8 +115,14 @@ class MLEngine(object):
         model = SelectFromModel(lsvc, prefit=True)
         X_new = model.transform(self.data)
         """
+        scaler = joblib.load(self.scaler_path)
+        X_scaled = scaler.transform(self.data)
+        # sel = joblib.load(self.feature_selection_path)
+        # selection_model = SelectFromModel(sel, prefit=True, threshold=self.min_threshold)
+        # X_new = selection_model.transform(X_scaled)
         clf = joblib.load(self.trained_model_path)
-        self.predicted = clf.predict(self.data)
+        self.predicted = clf.predict(X_scaled)
+
         prediction = {}
         if self.ground_truth is not None:
             prediction["report"] = classification_report(self.target, self.predicted)
