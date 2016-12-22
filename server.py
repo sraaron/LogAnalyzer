@@ -115,7 +115,8 @@ def analyze_txt_result(command):
     txt_result_importer = TxtResultImporter(params, mode="test")
     debug_msg_set, feature_set, data_set, ground_truth, acp_version = txt_result_importer.extract_results()
     learning_engine = MLEngine(acp_version=acp_version, start_path=params["start_txt_path"], end_path=params["end_txt_path"], msg_template_set=debug_msg_set, feature_set=feature_set, data_set=data_set, ground_truth=ground_truth)
-    learning_engine.predict()
+    #learning_engine.predict()
+    learning_engine.test()
     print "DONE Prediction!"
 
 

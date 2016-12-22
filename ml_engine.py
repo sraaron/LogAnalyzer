@@ -3,20 +3,30 @@ import util
 import json
 import logging
 import pandas as pd
+import scipy.spatial.distance
 from operator import itemgetter
 from collections import Counter
 from sklearn import preprocessing
 from sklearn.externals import joblib
 from sklearn.metrics import confusion_matrix
-from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.svm import SVC
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import LinearSVC
+from imblearn.over_sampling import SMOTE
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import classification_report
 from sklearn.feature_selection import SelectFromModel
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
 
 
 logger = logging.getLogger(__name__)
 missing_value = 0  # 'NaN'  # sys.maxint  #
-max_features = 5
+max_features = 25
 
 class MLEngine(object):
     """Train ML Engine"""
@@ -41,7 +51,7 @@ class MLEngine(object):
         self.data = None
         self.n_features = None
         self.n_samples = None
-        self.classifier = RandomForestClassifier(n_estimators=25)
+        self.classifier = SVC(gamma=2, C=1, shrinking=False, verbose=2)
         self.min_threshold = 0
 
         # RandomForestClassifier(n_estimators=25)
@@ -60,6 +70,80 @@ class MLEngine(object):
         self.features_selected_path = os.path.join(self.cur_path, "templates",
                                                         branch + "_RmpSpTranscodePack_selected_features.json")
 
+
+    def test(self):
+        self.data, self.n_features, self.n_samples = self.format_data(mode="test")
+        # X_normalized = preprocessing.scale(self.data)
+        # preprocessing.sale(self.data)# preprocessing.normalize(self.data, norm='l2')
+        X_normalized = preprocessing.normalize(self.data, norm='l1')
+        # split dataset into train and test
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_normalized, self.target, test_size=0.5, random_state=0)
+        # Set the parameters by cross-validation
+        linear_svc_parameters = {'C': [0.1, 0.3, 0.5, 0.7, 1], 'class_weight': 'balanced'}
+        svc_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
+                             'C': [0.1, 0.5, 1, 10, 100, 1000]},
+                            {'kernel': ['linear'], 'C': [0.1, 0.5, 1, 10, 100, 1000]}]
+
+        knn_parameters = [{"n_neighbors": [2, 5, 10, 15, 20], "algorithm": ['auto', 'ball_tree', 'kd_tree', 'brute'], "p": [1, 2],
+                           "weights": ['uniform', 'distance']}]
+
+        ensemble_parameters = [{"n_estimators": [10, 20, 50, 100], "criterion": ["gini", "entropy"],
+                                "max_features": [1, 5, 10, 10, 20, 25],
+                                "max_depth": [None, 1, 5, 10], "bootstrap": [True, False], "oob_score": [True, False],
+                                "class_weight": [None, "balanced_subsample", "balanced"],
+                                "min_samples_split": [1, 2, 5], "random_state": [0, 1, 2, None]}]
+        cl_list = [SVC]
+        cl_list = [LinearSVC]
+        cl_list = [DecisionTreeClassifier, RandomForestClassifier, ExtraTreesClassifier]
+
+        # resampling unbalanced data
+        # Apply SMOTE SVM
+        sm = SMOTE(kind='svm')
+        X_resampled, y_resampled = sm.fit_sample(X_train, y_train)
+
+        for cl in cl_list:
+            print("# Tuning hyper-parameters for %s" % 'default')
+            print(cl)
+            if cl == DecisionTreeClassifier:
+                ensemble_parameters = [{"criterion": ["gini", "entropy"],
+                                        "max_features": [1, 5, 10, 10, 20, 25],
+                                        "max_depth": [None, 1, 5, 10],
+                                        "class_weight": [None, "balanced"],
+                                        "min_samples_split": [1, 2, 5], "random_state": [0, 1, 2, None]}]
+            # clf = GridSearchCV(SVC(C=1, cache_size=7000), tuned_parameters, cv=5, n_jobs=1, scoring='%s_macro' % score)
+            # clf = GridSearchCV(LinearSVC(), param_grid={'C': [0.1, 0.3, 0.5, 0.7, 1]})
+            # clf = GridSearchCV(SVC(), param_grid=svc_parameters)
+            # clf = GridSearchCV(KNeighborsClassifier(), param_grid=knn_parameters, scoring='accuracy')
+            clf = GridSearchCV(cl(), param_grid=ensemble_parameters, scoring='f1')
+            clf.fit(X_resampled, y_resampled)
+
+            print("Best parameters set found on development set:")
+            print()
+            print(clf.best_params_)
+            print()
+            print("confusion matrix for best estimator:")
+            y_pred = clf.best_estimator_.predict(X_normalized)
+            print confusion_matrix(self.target, y_pred)
+            print("Grid scores on development set:")
+            print()
+            means = clf.cv_results_['mean_test_score']
+            stds = clf.cv_results_['std_test_score']
+            for mean, std, params in zip(means, stds, clf.cv_results_['params']):
+                print("%0.3f (+/-%0.03f) for %r"
+                      % (mean, std * 2, params))
+            print()
+
+            print("Detailed classification report:")
+            print()
+            print("The model is trained on the full development set.")
+            print("The scores are computed on the full evaluation set.")
+            print()
+            y_true, y_pred = y_test, clf.predict(X_test)
+            print(classification_report(y_true, y_pred))
+            print()
+
+
     def train(self):
         self.data, self.n_features, self.n_samples = self.format_data(mode="train")
         with open(self.features_path, "r") as f:
@@ -67,7 +151,7 @@ class MLEngine(object):
 
         # feature selection
         # fit an Extra Trees model to the data
-        sel = ExtraTreesClassifier()
+        sel = ExtraTreesClassifier(verbose=2)  # RandomForestClassifier(n_estimators=30, verbose=2)
         sel.fit(self.data, self.target)
         if os.path.isfile(self.feature_selection_path):
             os.remove(self.feature_selection_path)
@@ -76,6 +160,7 @@ class MLEngine(object):
         features_selected = {}
         # display the relative importance of each attribute
         for idx, importance in enumerate(sel.feature_importances_):
+            print importance
             features_selected[features_names[idx]] = importance
         features_selected = dict(Counter(features_selected).most_common(max_features))
         self.min_threshold = min(features_selected.iteritems(), key=itemgetter(1))[1]
@@ -90,10 +175,40 @@ class MLEngine(object):
         if os.path.isfile(self.scaler_path):
             os.remove(self.scaler_path)
         joblib.dump(scaler, self.scaler_path, compress=9)
-
         X_scaled = scaler.transform(X_new)
 
-        clf = self.classifier.fit(X_scaled, self.target)
+        """
+        # create a base classifier used to evaluate a subset of attributes
+        model = LogisticRegression()
+        # create the RFE model and select 3 attributes
+        rfe = RFE(model, 3)
+        rfe = rfe.fit(X_scaled, self.target)
+        # summarize the selection of the attributes
+        X_data = rfe.transform(X_scaled)
+        support = rfe.support_
+        features = features_selected.keys()
+        features_rfe = []
+        for idx, support_feature in enumerate(support):
+            if support_feature:
+                features_rfe.append(features[idx])
+        with open(self.features_selected_path, "w") as f:
+            json.dump(features_rfe, f, indent=2)
+        # print(rfe.support_)
+        # print(rfe.ranking_)
+
+        scaler = preprocessing.StandardScaler().fit(X_data)
+        if os.path.isfile(self.scaler_path):
+            os.remove(self.scaler_path)
+        joblib.dump(scaler, self.scaler_path, compress=9)
+        X_scaled = scaler.transform(X_data)
+        """
+
+        # resampling unbalanced data
+        # Apply SMOTE SVM
+        sm = SMOTE(kind='svm')
+        X_resampled, y_resampled = sm.fit_sample(X_scaled, self.target)
+
+        clf = self.classifier.fit(X_resampled, y_resampled)
         self.n_samples, self.n_features = X_scaled.shape
 
         # evaluate training error
@@ -154,6 +269,27 @@ class MLEngine(object):
             try:
                 rv_features = []
                 debug_msg_match = False
+                """
+                if log_line["debug_variables"] != {}:
+                    for idx, variable_name in enumerate(log_line["debug_variables"]):
+                        debug_msg_id = float(str(log_line["msg_id"]) + "." + str(idx))
+                        rv_features.append(debug_msg_id)  # debug_variable_id
+                        # debug_variable_value
+                        rv_features.append(util.variable_eval(log_line["debug_variables"][variable_name]))
+                        for feature in feature_template:
+                            if feature != "debug_variable_id" and feature != "debug_variable_value":
+                                rv_features.append(log_line[feature])
+                        rv_data.append(rv_features)
+                        rv_features = []
+                else:
+                    rv_features.append(float(str(log_line["msg_id"]) + ".0"))  # debug_variable_id
+                    rv_features.append(0.0)  # debug_variable_value
+                    for feature in feature_template:
+                        if feature != "debug_variable_id" and feature != "debug_variable_value":
+                            rv_features.append(log_line[feature])
+                    rv_data.append(rv_features)
+                    rv_features = []
+                """
                 for idx, feature in enumerate(feature_template):
                         if '-' in feature:
                             hash_variable = feature.split('-', 1)
@@ -161,10 +297,14 @@ class MLEngine(object):
                                 debug_msg_match = True
                                 rv_features.append(util.variable_eval(log_line["debug_variables"][hash_variable[1]]))
                             else:
+                                rv_features.append(missing_value)
+                                """
                                 if len(rv_data) > 0:
-                                    rv_features.append(rv_data[len(rv_data) - 1][idx])  # use previous value, use as state
+                                    # use previous value, use as state
+                                    rv_features.append(rv_data[len(rv_data) - 1][idx])
                                 else:
                                     rv_features.append(missing_value)
+                                """
                         else:
                             if feature in log_line and "" != log_line[feature]:
                                 rv_features.append(log_line[feature])

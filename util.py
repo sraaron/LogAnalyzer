@@ -39,11 +39,18 @@ def str_timedelta_to_float(str_timedelta):
                                 minutes=float_timedelta.minute, hours=float_timedelta.hour)
     return float_timedelta.total_seconds()
 
+stringdict = {}
 
 def variable_eval(val):
     # if string return exists
     if isinstance(val, basestring):
-        return 1
+        # return 1
+        return 0
+        """
+        if val not in stringdict:
+            stringdict[val] = len(stringdict)
+        return stringdict[val]
+        """
     # else return value
     else:
         return val
@@ -156,6 +163,8 @@ class Hasher(object):
 
     def digest(self):
         return self.hash_fnc.hexdigest()
+
+
 
 
 def version_to_branch_mapping(version):
